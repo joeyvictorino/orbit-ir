@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbit-agent-incident-lab"
+version = "0.1.0"
+description = "Reproducible synthetic agent-incident reconstruction and evidence reconciliation"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Joey Victorino"}]
+
+[project.scripts]
+orbit-ir = "orbit_ir.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["orbit_ir*"]

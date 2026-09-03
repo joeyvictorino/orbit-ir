@@ -1,0 +1,2942 @@
+[
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0044",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0044",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000030",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-30",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-13",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000030"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0049",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0049",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000034",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-34",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000034"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0076",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0076",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000051",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-04",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000051"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0106",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0106",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000066",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-19",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000066"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0138",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0138",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000084",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-37",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-16",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000084"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0216",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0216",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000128",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-34",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-9",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000128"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0219",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0219",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000130",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-36",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000130"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0275",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0275",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000163",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-22",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-10",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000163"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0278",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0278",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000165",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-24",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000165"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0311",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0311",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000183",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-42",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-13",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000183"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0339",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0339",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000197",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-09",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-10",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000197"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0349",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0349",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000203",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-15",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-16",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000203"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0366",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0366",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000217",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-29",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-13",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000217"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0376",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0376",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000225",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-37",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-4",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000225"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0401",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0401",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000236",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-01",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000236"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0406",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0406",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000240",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-05",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000240"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0416",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0416",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000246",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-11",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-8",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000246"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0468",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0468",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000272",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-37",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000272"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0473",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0473",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000276",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-41",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-4",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000276"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0498",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0498",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000292",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-10",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-3",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000292"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0585",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0585",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000339",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-10",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-16",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000339"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0601",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0601",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000349",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-20",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-9",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000349"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0622",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0622",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000358",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-29",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-1",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000358"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0681",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0681",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000392",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-16",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-1",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000392"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0705",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0705",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000402",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-26",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000402"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0710",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0710",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000405",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-29",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000405"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0729",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0729",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000416",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-40",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-8",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000416"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0774",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0774",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000445",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-22",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-3",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000445"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0783",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0783",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000451",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-28",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-9",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000451"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0840",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0840",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000482",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-12",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-6",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000482"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0874",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0874",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000502",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-32",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-9",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000502"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0886",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0886",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000510",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-40",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000510"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0898",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0898",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000520",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-03",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-10",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000520"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0966",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0966",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000558",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-41",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000558"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0967",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0967",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000559",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-42",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000559"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0972",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0972",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000563",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-46",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000563"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1012",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1012",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000590",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-26",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000590"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1021",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1021",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000594",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-30",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-16",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000594"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1042",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1042",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000607",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-43",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000607"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1045",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1045",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000610",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-46",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000610"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1053",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1053",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000614",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-03",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000614"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1091",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1091",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000641",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-30",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000641"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1153",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1153",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000678",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-20",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000678"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0705",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0705",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000705",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-00",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-8",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000705"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0727",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0727",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000727",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-22",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-13",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000727"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0742",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0742",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000742",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-37",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000742"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0750",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0750",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000750",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-45",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000750"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0763",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0763",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000763",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-11",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000763"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0771",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0771",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000771",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-19",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-6",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000771"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0779",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0779",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000779",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-27",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000779"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0792",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0792",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000792",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-40",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-10",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000792"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0803",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0803",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000803",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-04",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-4",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000803"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0847",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0847",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000847",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-01",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000847"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0858",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0858",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000858",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-12",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-8",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000858"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0873",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0873",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000873",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-27",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-6",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000873"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0891",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0891",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000891",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-45",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-7",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000891"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0937",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0937",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000937",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-44",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000937"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0953",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0953",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000953",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-13",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-1",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000953"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0955",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0955",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000955",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-15",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-3",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000955"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0965",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0965",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000965",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-25",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-13",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000965"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0973",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0973",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000973",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-33",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-4",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000973"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0976",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0976",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000976",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-36",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-7",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000976"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0980",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0980",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000980",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-40",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000980"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0985",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0985",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000985",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-45",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-16",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000985"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0998",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0998",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000998",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-11",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-000998"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1010",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1010",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001010",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-23",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-7",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001010"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1031",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1031",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001031",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-44",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001031"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1038",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1038",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001038",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-04",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-1",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001038"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1051",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1051",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001051",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-17",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001051"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1052",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1052",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001052",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-18",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-15",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001052"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1068",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1068",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001068",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-34",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-14",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001068"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1093",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1093",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001093",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-12",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-5",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001093"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1115",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1115",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001115",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-34",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-10",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001115"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1131",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1131",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001131",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-03",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-9",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001131"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1133",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1133",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001133",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-05",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001133"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1147",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1147",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001147",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-19",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-8",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001147"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1159",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1159",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001159",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-31",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-3",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001159"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1168",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1168",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001168",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-40",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-12",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001168"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-1179",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-1179",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001179",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-04",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-6",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001179"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0001",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0001",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001201",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-26",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-11",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001201"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0024",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0024",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001224",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-02",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001224"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0026",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0026",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001226",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-04",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-2",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001226"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0058",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0058",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001258",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-36",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-0",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001258"
+  },
+  {
+    "basis": "stable tool_call_id plus independent control-plane record",
+    "confidence": "high",
+    "path": [
+      {
+        "id": "agent-0061",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0061",
+        "type": "agent"
+      },
+      {
+        "id": "tool-001261",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-39",
+        "type": "credential"
+      },
+      {
+        "id": "package-registry/scorer-3",
+        "type": "resource"
+      },
+      {
+        "id": "scorer-artifact-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow-observed",
+        "type": "control_decision"
+      }
+    ],
+    "trace_id": "trace-001261"
+  }
+]

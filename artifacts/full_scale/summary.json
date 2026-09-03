@@ -1,0 +1,68 @@
+{
+  "corpus": {
+    "agents": 1200,
+    "control_plane_events": 1300,
+    "first_timestamp": "2026-07-08T18:00:00Z",
+    "last_timestamp": "2026-07-14T10:06:33Z",
+    "messages": 70000,
+    "transcripts": 1300
+  },
+  "evaluation": {
+    "coordinator_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 6
+    },
+    "interpretation": "Ground-truth scores measure deterministic correlation on generated data, not expected production accuracy.",
+    "participant_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 700
+    },
+    "spoof_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 84
+    }
+  },
+  "findings": {
+    "board_participants": 700,
+    "top_coordinators": [
+      "agent-0058",
+      "agent-1097",
+      "agent-0889",
+      "agent-0873",
+      "agent-0475",
+      "agent-0339"
+    ],
+    "trajectory_records": 84,
+    "transcript_tool_call_mismatches": 84,
+    "unsanctioned_board_messages": 57400
+  },
+  "limitations": [
+    "All data is synthetic and structurally cleaner than production telemetry.",
+    "Stable tool-call identifiers make reconciliation easier than in many real environments.",
+    "Behavior categories are deterministic labels, not claims about model intent.",
+    "The lab demonstrates investigation mechanics, not frontier-model interpretability or RL post-training expertise."
+  ],
+  "method": {
+    "authoritative_source": "control_plane.jsonl",
+    "evidence_controls": [
+      "SHA-256 manifest",
+      "stable IDs",
+      "UTC timestamps",
+      "source and line references"
+    ],
+    "llm_boundary": "No LLM is used for factual extraction, joins, integrity checks, or findings. An LLM may summarize already-cited findings only.",
+    "untrusted_source": "transcripts.jsonl"
+  },
+  "runtime_seconds": 0.399,
+  "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
+  "synthetic": true
+}

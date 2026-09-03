@@ -1,0 +1,25 @@
+{
+  "files": [
+    {
+      "bytes": 20272256,
+      "name": "messages.jsonl",
+      "sha256": "68283140e2a00829e6238a56db67d6c41077929aa0f13cf94b4379265b703c59"
+    },
+    {
+      "bytes": 388700,
+      "name": "transcripts.jsonl",
+      "sha256": "e11aa6d37d9e0228eec9daccffe17aa573c7da3cbaa937bdf8b81e5e935f8c4b"
+    },
+    {
+      "bytes": 516714,
+      "name": "control_plane.jsonl",
+      "sha256": "55f437f65d29325c3c8e875d61aeb979dc4310a68c3490fb41330268db98ab56"
+    },
+    {
+      "bytes": 14703,
+      "name": "ground_truth.json",
+      "sha256": "614575b490bfd7c907c4c55632a979ddfe34f09d4f88720ba1fdf802fac1d11d"
+    }
+  ],
+  "synthetic": true
+}

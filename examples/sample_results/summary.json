@@ -1,0 +1,65 @@
+{
+  "corpus": {
+    "agents": 40,
+    "control_plane_events": 80,
+    "first_timestamp": "2026-07-08T18:00:00Z",
+    "last_timestamp": "2026-07-08T18:58:13Z",
+    "messages": 500,
+    "transcripts": 80
+  },
+  "evaluation": {
+    "coordinator_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 3
+    },
+    "interpretation": "Ground-truth scores measure deterministic correlation on generated data, not expected production accuracy.",
+    "participant_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 24
+    },
+    "spoof_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 7
+    }
+  },
+  "findings": {
+    "board_participants": 24,
+    "top_coordinators": [
+      "agent-0009",
+      "agent-0030",
+      "agent-0024"
+    ],
+    "trajectory_records": 7,
+    "transcript_tool_call_mismatches": 7,
+    "unsanctioned_board_messages": 410
+  },
+  "limitations": [
+    "All data is synthetic and structurally cleaner than production telemetry.",
+    "Stable tool-call identifiers make reconciliation easier than in many real environments.",
+    "Behavior categories are deterministic labels, not claims about model intent.",
+    "The lab demonstrates investigation mechanics, not frontier-model interpretability or RL post-training expertise."
+  ],
+  "method": {
+    "authoritative_source": "control_plane.jsonl",
+    "evidence_controls": [
+      "SHA-256 manifest",
+      "stable IDs",
+      "UTC timestamps",
+      "source and line references"
+    ],
+    "llm_boundary": "No LLM is used for factual extraction, joins, integrity checks, or findings. An LLM may summarize already-cited findings only.",
+    "untrusted_source": "transcripts.jsonl"
+  },
+  "runtime_seconds": 0.011,
+  "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
+  "synthetic": true
+}
