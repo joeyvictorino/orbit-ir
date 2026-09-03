@@ -3,7 +3,7 @@
     "agents": 40,
     "control_plane_events": 80,
     "first_timestamp": "2026-07-08T18:00:00Z",
-    "last_timestamp": "2026-07-08T18:58:13Z",
+    "last_timestamp": "2026-07-09T09:30:17.120000Z",
     "messages": 500,
     "transcripts": 80
   },
@@ -15,7 +15,7 @@
       "recall": 1.0,
       "true_positive": 3
     },
-    "interpretation": "Ground-truth scores measure deterministic correlation on generated data, not expected production accuracy.",
+    "interpretation": "The evaluation fixture was consulted only after detections were complete. Scores measure recovery on generated data, not expected production accuracy.",
     "participant_detection": {
       "false_negative": 0,
       "false_positive": 0,
@@ -33,6 +33,17 @@
   },
   "findings": {
     "board_participants": 24,
+    "coordinators_over_threshold": 3,
+    "duplicate_message_identifiers": 0,
+    "duplicate_tool_call_identifiers": 0,
+    "identity_or_trace_conflicts": 0,
+    "missing_control_plane_events": 0,
+    "missing_transcripts": 0,
+    "reason_counts": {
+      "argument-digest-mismatch": 7,
+      "tool-name-mismatch": 7
+    },
+    "record_conflicts": 7,
     "top_coordinators": [
       "agent-0009",
       "agent-0030",
@@ -45,21 +56,25 @@
   "limitations": [
     "All data is synthetic and structurally cleaner than production telemetry.",
     "Stable tool-call identifiers make reconciliation easier than in many real environments.",
-    "Behavior categories are deterministic labels, not claims about model intent.",
+    "The coordinator threshold is explicit and scenario-specific, not a claim about intent.",
+    "Hash manifests prove post-acquisition integrity, not the truthfulness of the originating system.",
     "The lab demonstrates investigation mechanics, not frontier-model interpretability or RL post-training expertise."
   ],
   "method": {
-    "authoritative_source": "control_plane.jsonl",
+    "authoritative_source": "control_plane.jsonl for executed tool activity",
+    "coordinator_threshold": "at least 2 observed assignment events",
     "evidence_controls": [
       "SHA-256 manifest",
       "stable IDs",
       "UTC timestamps",
-      "source and line references"
+      "source file and line references",
+      "duplicate and missing-record detection"
     ],
+    "ground_truth_dependency": "none; an optional fixture is used only after detections for evaluation",
     "llm_boundary": "No LLM is used for factual extraction, joins, integrity checks, or findings. An LLM may summarize already-cited findings only.",
     "untrusted_source": "transcripts.jsonl"
   },
-  "runtime_seconds": 0.011,
-  "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
+  "runtime_seconds": 0.012,
+  "scenario": "Synthetic cross-agent coordination and transcript/control-plane inconsistency exercise",
   "synthetic": true
 }

@@ -1,0 +1,44 @@
+name: Python tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: python -m pip install .
+
+      - name: Run adversarial regression suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Run full synthetic exercise
+        run: orbit-ir demo --workdir work
+
+      - name: Prove analysis works without ground truth
+        run: |
+          mv work/evidence/ground_truth.json work/ground_truth.evaluation-only.json
+          orbit-ir analyze --input work/evidence --out work/independent-results
+          python -c 'import json; from pathlib import Path; data=json.loads(Path("work/independent-results/summary.json").read_text()); assert "evaluation" not in data'

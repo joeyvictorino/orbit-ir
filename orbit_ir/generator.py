@@ -32,10 +32,22 @@ def _write_jsonl(path: Path, rows: Iterable[dict]) -> None:
 
 
 def generate_dataset(output_dir: Path, config: LabConfig) -> dict:
+    if config.agents < 1:
+        raise ValueError("agents must be at least 1")
+    if config.messages < 0:
+        raise ValueError("messages cannot be negative")
+    if config.transcripts < 0:
+        raise ValueError("transcripts cannot be negative")
+    if config.participants < 1:
+        raise ValueError("participants must be at least 1")
     if config.participants > config.agents:
         raise ValueError("participants cannot exceed agents")
+    if config.coordinators < 1:
+        raise ValueError("coordinators must be at least 1")
     if config.coordinators > config.participants:
         raise ValueError("coordinators cannot exceed participants")
+    if config.spoofed_tool_calls < 0:
+        raise ValueError("spoofed tool calls cannot be negative")
     if config.spoofed_tool_calls > config.transcripts:
         raise ValueError("spoofed tool calls cannot exceed transcripts")
 

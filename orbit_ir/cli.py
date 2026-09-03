@@ -25,6 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
     analyze = subparsers.add_parser("analyze", help="Analyze evidence and write source-linked findings")
     analyze.add_argument("--input", type=Path, required=True)
     analyze.add_argument("--out", type=Path, required=True)
+    analyze.add_argument(
+        "--ground-truth",
+        type=Path,
+        help="Optional synthetic evaluation fixture; never used to determine findings",
+    )
+    analyze.add_argument("--coordinator-min-assignments", type=int, default=2)
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -47,13 +53,22 @@ def main() -> None:
         truth = generate_dataset(args.out, config)
         print(json.dumps({"status": "generated", "config": truth["config"]}, sort_keys=True))
     elif args.command == "analyze":
-        summary = analyze_dataset(args.input, args.out)
+        summary = analyze_dataset(
+            args.input,
+            args.out,
+            ground_truth_path=args.ground_truth,
+            coordinator_min_assignments=args.coordinator_min_assignments,
+        )
         print(json.dumps(summary, sort_keys=True))
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"
         generate_dataset(data_dir, LabConfig(seed=args.seed))
-        summary = analyze_dataset(data_dir, result_dir)
+        summary = analyze_dataset(
+            data_dir,
+            result_dir,
+            ground_truth_path=data_dir / "ground_truth.json",
+        )
         print(json.dumps(summary, sort_keys=True))
 
 

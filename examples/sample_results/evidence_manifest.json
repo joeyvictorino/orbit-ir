@@ -3,21 +3,25 @@
     {
       "bytes": 144800,
       "name": "messages.jsonl",
+      "role": "evidence",
       "sha256": "92bd18ef6cba67ea2bd095be1ff637183a5e25406b68d068efae7c3c7b7f13af"
     },
     {
       "bytes": 23920,
       "name": "transcripts.jsonl",
+      "role": "evidence",
       "sha256": "e12b6c6ff8205d19fed26be0776283f574b3038f42aa99a39c4a6777508504ea"
     },
     {
       "bytes": 31842,
       "name": "control_plane.jsonl",
+      "role": "evidence",
       "sha256": "69312b21fbd1b99ca44927284f2c2f6a6213999d4d6277884d38b21ee8278401"
     },
     {
       "bytes": 1004,
       "name": "ground_truth.json",
+      "role": "evaluation-only",
       "sha256": "b307aaab3c908db934048bfcd331010491f66e640c4a1cd1b5a0e8c0cce383ad"
     }
   ],

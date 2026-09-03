@@ -1,7 +1,8 @@
 [
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000001",
     "path": [
       {
         "id": "agent-0044",
@@ -32,11 +33,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:31",
+      "transcript": "transcripts.jsonl:31"
+    },
     "trace_id": "trace-000030"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000002",
     "path": [
       {
         "id": "agent-0049",
@@ -67,11 +73,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:35",
+      "transcript": "transcripts.jsonl:35"
+    },
     "trace_id": "trace-000034"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000003",
     "path": [
       {
         "id": "agent-0076",
@@ -102,11 +113,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:52",
+      "transcript": "transcripts.jsonl:52"
+    },
     "trace_id": "trace-000051"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000004",
     "path": [
       {
         "id": "agent-0106",
@@ -137,11 +153,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:67",
+      "transcript": "transcripts.jsonl:67"
+    },
     "trace_id": "trace-000066"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000005",
     "path": [
       {
         "id": "agent-0138",
@@ -172,11 +193,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:85",
+      "transcript": "transcripts.jsonl:85"
+    },
     "trace_id": "trace-000084"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000006",
     "path": [
       {
         "id": "agent-0216",
@@ -207,11 +233,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:129",
+      "transcript": "transcripts.jsonl:129"
+    },
     "trace_id": "trace-000128"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000007",
     "path": [
       {
         "id": "agent-0219",
@@ -242,11 +273,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:131",
+      "transcript": "transcripts.jsonl:131"
+    },
     "trace_id": "trace-000130"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000008",
     "path": [
       {
         "id": "agent-0275",
@@ -277,11 +313,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:164",
+      "transcript": "transcripts.jsonl:164"
+    },
     "trace_id": "trace-000163"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000009",
     "path": [
       {
         "id": "agent-0278",
@@ -312,11 +353,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:166",
+      "transcript": "transcripts.jsonl:166"
+    },
     "trace_id": "trace-000165"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000010",
     "path": [
       {
         "id": "agent-0311",
@@ -347,11 +393,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:184",
+      "transcript": "transcripts.jsonl:184"
+    },
     "trace_id": "trace-000183"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000011",
     "path": [
       {
         "id": "agent-0339",
@@ -382,11 +433,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:198",
+      "transcript": "transcripts.jsonl:198"
+    },
     "trace_id": "trace-000197"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000012",
     "path": [
       {
         "id": "agent-0349",
@@ -417,11 +473,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:204",
+      "transcript": "transcripts.jsonl:204"
+    },
     "trace_id": "trace-000203"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000013",
     "path": [
       {
         "id": "agent-0366",
@@ -452,11 +513,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:218",
+      "transcript": "transcripts.jsonl:218"
+    },
     "trace_id": "trace-000217"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000014",
     "path": [
       {
         "id": "agent-0376",
@@ -487,11 +553,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:226",
+      "transcript": "transcripts.jsonl:226"
+    },
     "trace_id": "trace-000225"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000015",
     "path": [
       {
         "id": "agent-0401",
@@ -522,11 +593,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:237",
+      "transcript": "transcripts.jsonl:237"
+    },
     "trace_id": "trace-000236"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000016",
     "path": [
       {
         "id": "agent-0406",
@@ -557,11 +633,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:241",
+      "transcript": "transcripts.jsonl:241"
+    },
     "trace_id": "trace-000240"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000017",
     "path": [
       {
         "id": "agent-0416",
@@ -592,11 +673,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:247",
+      "transcript": "transcripts.jsonl:247"
+    },
     "trace_id": "trace-000246"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000018",
     "path": [
       {
         "id": "agent-0468",
@@ -627,11 +713,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:273",
+      "transcript": "transcripts.jsonl:273"
+    },
     "trace_id": "trace-000272"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000019",
     "path": [
       {
         "id": "agent-0473",
@@ -662,11 +753,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:277",
+      "transcript": "transcripts.jsonl:277"
+    },
     "trace_id": "trace-000276"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000020",
     "path": [
       {
         "id": "agent-0498",
@@ -697,11 +793,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:293",
+      "transcript": "transcripts.jsonl:293"
+    },
     "trace_id": "trace-000292"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000021",
     "path": [
       {
         "id": "agent-0585",
@@ -732,11 +833,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:340",
+      "transcript": "transcripts.jsonl:340"
+    },
     "trace_id": "trace-000339"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000022",
     "path": [
       {
         "id": "agent-0601",
@@ -767,11 +873,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:350",
+      "transcript": "transcripts.jsonl:350"
+    },
     "trace_id": "trace-000349"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000023",
     "path": [
       {
         "id": "agent-0622",
@@ -802,11 +913,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:359",
+      "transcript": "transcripts.jsonl:359"
+    },
     "trace_id": "trace-000358"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000024",
     "path": [
       {
         "id": "agent-0681",
@@ -837,11 +953,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:393",
+      "transcript": "transcripts.jsonl:393"
+    },
     "trace_id": "trace-000392"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000025",
     "path": [
       {
         "id": "agent-0705",
@@ -872,11 +993,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:403",
+      "transcript": "transcripts.jsonl:403"
+    },
     "trace_id": "trace-000402"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000026",
     "path": [
       {
         "id": "agent-0710",
@@ -907,11 +1033,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:406",
+      "transcript": "transcripts.jsonl:406"
+    },
     "trace_id": "trace-000405"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000027",
     "path": [
       {
         "id": "agent-0729",
@@ -942,11 +1073,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:417",
+      "transcript": "transcripts.jsonl:417"
+    },
     "trace_id": "trace-000416"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000028",
     "path": [
       {
         "id": "agent-0774",
@@ -977,11 +1113,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:446",
+      "transcript": "transcripts.jsonl:446"
+    },
     "trace_id": "trace-000445"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000029",
     "path": [
       {
         "id": "agent-0783",
@@ -1012,11 +1153,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:452",
+      "transcript": "transcripts.jsonl:452"
+    },
     "trace_id": "trace-000451"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000030",
     "path": [
       {
         "id": "agent-0840",
@@ -1047,11 +1193,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:483",
+      "transcript": "transcripts.jsonl:483"
+    },
     "trace_id": "trace-000482"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000031",
     "path": [
       {
         "id": "agent-0874",
@@ -1082,11 +1233,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:503",
+      "transcript": "transcripts.jsonl:503"
+    },
     "trace_id": "trace-000502"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000032",
     "path": [
       {
         "id": "agent-0886",
@@ -1117,11 +1273,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:511",
+      "transcript": "transcripts.jsonl:511"
+    },
     "trace_id": "trace-000510"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000033",
     "path": [
       {
         "id": "agent-0898",
@@ -1152,11 +1313,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:521",
+      "transcript": "transcripts.jsonl:521"
+    },
     "trace_id": "trace-000520"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000034",
     "path": [
       {
         "id": "agent-0966",
@@ -1187,11 +1353,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:559",
+      "transcript": "transcripts.jsonl:559"
+    },
     "trace_id": "trace-000558"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000035",
     "path": [
       {
         "id": "agent-0967",
@@ -1222,11 +1393,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:560",
+      "transcript": "transcripts.jsonl:560"
+    },
     "trace_id": "trace-000559"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000036",
     "path": [
       {
         "id": "agent-0972",
@@ -1257,11 +1433,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:564",
+      "transcript": "transcripts.jsonl:564"
+    },
     "trace_id": "trace-000563"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000037",
     "path": [
       {
         "id": "agent-1012",
@@ -1292,11 +1473,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:591",
+      "transcript": "transcripts.jsonl:591"
+    },
     "trace_id": "trace-000590"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000038",
     "path": [
       {
         "id": "agent-1021",
@@ -1327,11 +1513,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:595",
+      "transcript": "transcripts.jsonl:595"
+    },
     "trace_id": "trace-000594"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000039",
     "path": [
       {
         "id": "agent-1042",
@@ -1362,11 +1553,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:608",
+      "transcript": "transcripts.jsonl:608"
+    },
     "trace_id": "trace-000607"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000040",
     "path": [
       {
         "id": "agent-1045",
@@ -1397,11 +1593,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:611",
+      "transcript": "transcripts.jsonl:611"
+    },
     "trace_id": "trace-000610"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000041",
     "path": [
       {
         "id": "agent-1053",
@@ -1432,11 +1633,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:615",
+      "transcript": "transcripts.jsonl:615"
+    },
     "trace_id": "trace-000614"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000042",
     "path": [
       {
         "id": "agent-1091",
@@ -1467,11 +1673,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:642",
+      "transcript": "transcripts.jsonl:642"
+    },
     "trace_id": "trace-000641"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000043",
     "path": [
       {
         "id": "agent-1153",
@@ -1502,11 +1713,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:679",
+      "transcript": "transcripts.jsonl:679"
+    },
     "trace_id": "trace-000678"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000044",
     "path": [
       {
         "id": "agent-0705",
@@ -1537,11 +1753,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:706",
+      "transcript": "transcripts.jsonl:706"
+    },
     "trace_id": "trace-000705"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000045",
     "path": [
       {
         "id": "agent-0727",
@@ -1572,11 +1793,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:728",
+      "transcript": "transcripts.jsonl:728"
+    },
     "trace_id": "trace-000727"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000046",
     "path": [
       {
         "id": "agent-0742",
@@ -1607,11 +1833,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:743",
+      "transcript": "transcripts.jsonl:743"
+    },
     "trace_id": "trace-000742"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000047",
     "path": [
       {
         "id": "agent-0750",
@@ -1642,11 +1873,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:751",
+      "transcript": "transcripts.jsonl:751"
+    },
     "trace_id": "trace-000750"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000048",
     "path": [
       {
         "id": "agent-0763",
@@ -1677,11 +1913,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:764",
+      "transcript": "transcripts.jsonl:764"
+    },
     "trace_id": "trace-000763"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000049",
     "path": [
       {
         "id": "agent-0771",
@@ -1712,11 +1953,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:772",
+      "transcript": "transcripts.jsonl:772"
+    },
     "trace_id": "trace-000771"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000050",
     "path": [
       {
         "id": "agent-0779",
@@ -1747,11 +1993,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:780",
+      "transcript": "transcripts.jsonl:780"
+    },
     "trace_id": "trace-000779"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000051",
     "path": [
       {
         "id": "agent-0792",
@@ -1782,11 +2033,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:793",
+      "transcript": "transcripts.jsonl:793"
+    },
     "trace_id": "trace-000792"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000052",
     "path": [
       {
         "id": "agent-0803",
@@ -1817,11 +2073,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:804",
+      "transcript": "transcripts.jsonl:804"
+    },
     "trace_id": "trace-000803"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000053",
     "path": [
       {
         "id": "agent-0847",
@@ -1852,11 +2113,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:848",
+      "transcript": "transcripts.jsonl:848"
+    },
     "trace_id": "trace-000847"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000054",
     "path": [
       {
         "id": "agent-0858",
@@ -1887,11 +2153,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:859",
+      "transcript": "transcripts.jsonl:859"
+    },
     "trace_id": "trace-000858"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000055",
     "path": [
       {
         "id": "agent-0873",
@@ -1922,11 +2193,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:874",
+      "transcript": "transcripts.jsonl:874"
+    },
     "trace_id": "trace-000873"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000056",
     "path": [
       {
         "id": "agent-0891",
@@ -1957,11 +2233,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:892",
+      "transcript": "transcripts.jsonl:892"
+    },
     "trace_id": "trace-000891"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000057",
     "path": [
       {
         "id": "agent-0937",
@@ -1992,11 +2273,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:938",
+      "transcript": "transcripts.jsonl:938"
+    },
     "trace_id": "trace-000937"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000058",
     "path": [
       {
         "id": "agent-0953",
@@ -2027,11 +2313,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:954",
+      "transcript": "transcripts.jsonl:954"
+    },
     "trace_id": "trace-000953"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000059",
     "path": [
       {
         "id": "agent-0955",
@@ -2062,11 +2353,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:956",
+      "transcript": "transcripts.jsonl:956"
+    },
     "trace_id": "trace-000955"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000060",
     "path": [
       {
         "id": "agent-0965",
@@ -2097,11 +2393,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:966",
+      "transcript": "transcripts.jsonl:966"
+    },
     "trace_id": "trace-000965"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000061",
     "path": [
       {
         "id": "agent-0973",
@@ -2132,11 +2433,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:974",
+      "transcript": "transcripts.jsonl:974"
+    },
     "trace_id": "trace-000973"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000062",
     "path": [
       {
         "id": "agent-0976",
@@ -2167,11 +2473,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:977",
+      "transcript": "transcripts.jsonl:977"
+    },
     "trace_id": "trace-000976"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000063",
     "path": [
       {
         "id": "agent-0980",
@@ -2202,11 +2513,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:981",
+      "transcript": "transcripts.jsonl:981"
+    },
     "trace_id": "trace-000980"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000064",
     "path": [
       {
         "id": "agent-0985",
@@ -2237,11 +2553,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:986",
+      "transcript": "transcripts.jsonl:986"
+    },
     "trace_id": "trace-000985"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000065",
     "path": [
       {
         "id": "agent-0998",
@@ -2272,11 +2593,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:999",
+      "transcript": "transcripts.jsonl:999"
+    },
     "trace_id": "trace-000998"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000066",
     "path": [
       {
         "id": "agent-1010",
@@ -2307,11 +2633,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1011",
+      "transcript": "transcripts.jsonl:1011"
+    },
     "trace_id": "trace-001010"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000067",
     "path": [
       {
         "id": "agent-1031",
@@ -2342,11 +2673,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1032",
+      "transcript": "transcripts.jsonl:1032"
+    },
     "trace_id": "trace-001031"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000068",
     "path": [
       {
         "id": "agent-1038",
@@ -2377,11 +2713,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1039",
+      "transcript": "transcripts.jsonl:1039"
+    },
     "trace_id": "trace-001038"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000069",
     "path": [
       {
         "id": "agent-1051",
@@ -2412,11 +2753,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1052",
+      "transcript": "transcripts.jsonl:1052"
+    },
     "trace_id": "trace-001051"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000070",
     "path": [
       {
         "id": "agent-1052",
@@ -2447,11 +2793,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1053",
+      "transcript": "transcripts.jsonl:1053"
+    },
     "trace_id": "trace-001052"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000071",
     "path": [
       {
         "id": "agent-1068",
@@ -2482,11 +2833,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1069",
+      "transcript": "transcripts.jsonl:1069"
+    },
     "trace_id": "trace-001068"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000072",
     "path": [
       {
         "id": "agent-1093",
@@ -2517,11 +2873,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1094",
+      "transcript": "transcripts.jsonl:1094"
+    },
     "trace_id": "trace-001093"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000073",
     "path": [
       {
         "id": "agent-1115",
@@ -2552,11 +2913,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1116",
+      "transcript": "transcripts.jsonl:1116"
+    },
     "trace_id": "trace-001115"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000074",
     "path": [
       {
         "id": "agent-1131",
@@ -2587,11 +2953,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1132",
+      "transcript": "transcripts.jsonl:1132"
+    },
     "trace_id": "trace-001131"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000075",
     "path": [
       {
         "id": "agent-1133",
@@ -2622,11 +2993,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1134",
+      "transcript": "transcripts.jsonl:1134"
+    },
     "trace_id": "trace-001133"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000076",
     "path": [
       {
         "id": "agent-1147",
@@ -2657,11 +3033,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1148",
+      "transcript": "transcripts.jsonl:1148"
+    },
     "trace_id": "trace-001147"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000077",
     "path": [
       {
         "id": "agent-1159",
@@ -2692,11 +3073,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1160",
+      "transcript": "transcripts.jsonl:1160"
+    },
     "trace_id": "trace-001159"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000078",
     "path": [
       {
         "id": "agent-1168",
@@ -2727,11 +3113,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1169",
+      "transcript": "transcripts.jsonl:1169"
+    },
     "trace_id": "trace-001168"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000079",
     "path": [
       {
         "id": "agent-1179",
@@ -2762,11 +3153,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1180",
+      "transcript": "transcripts.jsonl:1180"
+    },
     "trace_id": "trace-001179"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000080",
     "path": [
       {
         "id": "agent-0001",
@@ -2797,11 +3193,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1202",
+      "transcript": "transcripts.jsonl:1202"
+    },
     "trace_id": "trace-001201"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000081",
     "path": [
       {
         "id": "agent-0024",
@@ -2832,11 +3233,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1225",
+      "transcript": "transcripts.jsonl:1225"
+    },
     "trace_id": "trace-001224"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000082",
     "path": [
       {
         "id": "agent-0026",
@@ -2867,11 +3273,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1227",
+      "transcript": "transcripts.jsonl:1227"
+    },
     "trace_id": "trace-001226"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000083",
     "path": [
       {
         "id": "agent-0058",
@@ -2902,11 +3313,16 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1259",
+      "transcript": "transcripts.jsonl:1259"
+    },
     "trace_id": "trace-001258"
   },
   {
-    "basis": "stable tool_call_id plus independent control-plane record",
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
+    "finding_id": "finding-000084",
     "path": [
       {
         "id": "agent-0061",
@@ -2937,6 +3353,10 @@
         "type": "control_decision"
       }
     ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:1262",
+      "transcript": "transcripts.jsonl:1262"
+    },
     "trace_id": "trace-001261"
   }
 ]

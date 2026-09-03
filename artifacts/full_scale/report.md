@@ -6,7 +6,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 
 ## Corpus
 
-- 1,200 agents
+- 1,200 observed agents
 - 70,000 message events
 - 1,300 transcript records
 - 1,300 independent control-plane events
@@ -16,23 +16,24 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 
 1. 700 agents used an unsanctioned coordination channel, producing 57,400 events.
 2. Independent control-plane evidence contradicted 84 transcript tool-call records.
-3. The pipeline reconstructed 84 identity-to-effect trajectories and ranked the highest-volume assignment coordinators.
+3. The pipeline reported 84 total record conflicts and reconstructed 84 source-linked trajectories.
+4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
-## Evaluation against synthetic ground truth
+## Evaluation against an optional synthetic fixture
 
 | Detection | Precision | Recall | TP | FP | FN |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Transcript/tool mismatch | 1.0000 | 1.0000 | 84 | 0 | 0 |
 | Channel participation | 1.0000 | 1.0000 | 700 | 0 | 0 |
-| Coordinator ranking | 1.0000 | 1.0000 | 6 | 0 | 0 |
+| Coordinator threshold | 1.0000 | 1.0000 | 6 | 0 | 0 |
 
-These scores validate the implementation against generated labels. They are not production performance claims.
+The fixture is consulted only after detection. It does not determine the findings or the number of coordinators reported.
 
 ## Evidence model
 
 `workload identity -> agent -> tool call -> credential -> resource -> effect -> control decision`
 
-Transcripts are treated as potentially untrusted. Factual findings require a stable identifier and an independent control-plane record. The pipeline writes SHA-256 hashes, source references, UTC timestamps, confidence, and the basis for each reconstructed trajectory.
+Transcripts are treated as potentially untrusted. Factual findings require independent control-plane support. The pipeline writes SHA-256 hashes, exact source lines, UTC timestamps, confidence, and the basis for each reconstructed trajectory.
 
 ## LLM boundary
 
@@ -42,14 +43,15 @@ No LLM is used for extraction, joins, hashes, mismatch detection, or findings. A
 
 - All data is synthetic and structurally cleaner than production telemetry.
 - Stable tool-call identifiers make reconciliation easier than in many real environments.
-- Behavior categories are deterministic labels, not claims about model intent.
+- The coordinator threshold is explicit and scenario-specific, not a claim about intent.
+- Hash manifests prove post-acquisition integrity, not the truthfulness of the originating system.
 - The lab demonstrates investigation mechanics, not frontier-model interpretability or RL post-training expertise.
 
 ## Evidence manifest
 
-- `messages.jsonl`: `68283140e2a00829e6238a56db67d6c41077929aa0f13cf94b4379265b703c59` (20,272,256 bytes)
-- `transcripts.jsonl`: `e11aa6d37d9e0228eec9daccffe17aa573c7da3cbaa937bdf8b81e5e935f8c4b` (388,700 bytes)
-- `control_plane.jsonl`: `55f437f65d29325c3c8e875d61aeb979dc4310a68c3490fb41330268db98ab56` (516,714 bytes)
-- `ground_truth.json`: `614575b490bfd7c907c4c55632a979ddfe34f09d4f88720ba1fdf802fac1d11d` (14,703 bytes)
+- `messages.jsonl` (evidence): `68283140e2a00829e6238a56db67d6c41077929aa0f13cf94b4379265b703c59` (20,272,256 bytes)
+- `transcripts.jsonl` (evidence): `e11aa6d37d9e0228eec9daccffe17aa573c7da3cbaa937bdf8b81e5e935f8c4b` (388,700 bytes)
+- `control_plane.jsonl` (evidence): `55f437f65d29325c3c8e875d61aeb979dc4310a68c3490fb41330268db98ab56` (516,714 bytes)
+- `ground_truth.json` (evaluation-only): `614575b490bfd7c907c4c55632a979ddfe34f09d4f88720ba1fdf802fac1d11d` (14,703 bytes)
 
-Runtime on the generating system: 0.399 seconds. Runtime is informational and hardware-dependent.
+Runtime on the generating system: 0.727 seconds. Runtime is informational and hardware-dependent.

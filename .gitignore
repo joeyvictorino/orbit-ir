@@ -1,4 +1,11 @@
 __pycache__/
 *.py[cod]
-.DS_Store
+*.egg-info/
+.coverage
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
 work/
+
