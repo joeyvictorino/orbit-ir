@@ -5,10 +5,9 @@ import hashlib
 import json
 import time
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
-
 
 EVIDENCE_FILES = ("messages.jsonl", "transcripts.jsonl", "control_plane.jsonl")
 SOURCE_FIELDS = {

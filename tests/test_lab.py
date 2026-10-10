@@ -139,12 +139,14 @@ class LabTest(unittest.TestCase):
                 analyze_dataset(root / "evidence", root / "results")
 
     def test_generator_rejects_unsafe_zero_participant_configuration(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            with self.assertRaisesRegex(ValueError, "participants must be at least 1"):
-                generate_dataset(
-                    Path(temp) / "evidence",
-                    LabConfig(agents=20, messages=100, transcripts=30, participants=0, spoofed_tool_calls=0, coordinators=0, seed=9),
-                )
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            self.assertRaisesRegex(ValueError, "participants must be at least 1"),
+        ):
+            generate_dataset(
+                Path(temp) / "evidence",
+                LabConfig(agents=20, messages=100, transcripts=30, participants=0, spoofed_tool_calls=0, coordinators=0, seed=9),
+            )
 
 
 if __name__ == "__main__":
