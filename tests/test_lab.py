@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import csv
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from orbit_ir import cli
 from orbit_ir.analyzer import EvidenceFormatError, analyze_dataset
 from orbit_ir.generator import LabConfig, generate_dataset
 
@@ -147,6 +151,38 @@ class LabTest(unittest.TestCase):
                 Path(temp) / "evidence",
                 LabConfig(agents=20, messages=100, transcripts=30, participants=0, spoofed_tool_calls=0, coordinators=0, seed=9),
             )
+
+    def test_cli_reports_malformed_evidence_without_a_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            generate_dataset(root / "evidence", LabConfig(agents=20, messages=100, transcripts=30, participants=10, spoofed_tool_calls=3, coordinators=2, seed=5))
+            message_path = root / "evidence" / "messages.jsonl"
+            rows = message_path.read_text(encoding="utf-8").splitlines()
+            message_path.write_text("{not-json}\n" + "\n".join(rows[1:]) + "\n", encoding="utf-8")
+            argv = ["orbit-ir", "analyze", "--input", str(root / "evidence"), "--out", str(root / "results")]
+            stderr = io.StringIO()
+            with (
+                mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+                self.assertRaises(SystemExit) as raised,
+            ):
+                cli.main()
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("error: messages.jsonl:1: invalid JSON", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_cli_reports_missing_evidence_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            argv = ["orbit-ir", "analyze", "--input", str(Path(temp) / "nope"), "--out", str(Path(temp) / "out")]
+            stderr = io.StringIO()
+            with (
+                mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+                self.assertRaises(SystemExit) as raised,
+            ):
+                cli.main()
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("missing evidence source", stderr.getvalue())
 
 
 if __name__ == "__main__":

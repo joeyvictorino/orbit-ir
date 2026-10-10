@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from .analyzer import analyze_dataset
@@ -40,6 +41,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    try:
+        _run(args)
+    except (ValueError, FileNotFoundError) as exc:
+        # Includes EvidenceFormatError (a ValueError) with its exact file:line message.
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+def _run(args: argparse.Namespace) -> None:
     if args.command == "generate":
         config = LabConfig(
             agents=args.agents,
