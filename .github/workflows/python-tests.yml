@@ -37,8 +37,34 @@ jobs:
       - name: Run full synthetic exercise
         run: orbit-ir demo --workdir work
 
+      - name: Regenerated results match the committed full-scale artifacts
+        run: |
+          for f in coordinator_ranking.json data_quality.json evidence_manifest.json findings.csv trajectories.json; do
+            diff -u "artifacts/full_scale/$f" "work/results/$f"
+          done
+          python -c 'import json; a=json.load(open("artifacts/full_scale/summary.json")); b=json.load(open("work/results/summary.json")); [d.pop("runtime_seconds") for d in (a, b)]; assert a == b, "summary.json differs beyond runtime_seconds"'
+
       - name: Prove analysis works without ground truth
         run: |
           mv work/evidence/ground_truth.json work/ground_truth.evaluation-only.json
           orbit-ir analyze --input work/evidence --out work/independent-results
           python -c 'import json; from pathlib import Path; data=json.loads(Path("work/independent-results/summary.json").read_text()); assert "evaluation" not in data'
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install ruff
+        run: python -m pip install ruff==0.17.0
+
+      - name: ruff check
+        run: ruff check .
