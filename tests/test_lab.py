@@ -142,6 +142,64 @@ class LabTest(unittest.TestCase):
             with self.assertRaisesRegex(EvidenceFormatError, r"messages\.jsonl:1: invalid JSON"):
                 analyze_dataset(root / "evidence", root / "results")
 
+    def test_non_string_identifiers_fail_closed_with_source_line(self) -> None:
+        cases = (
+            ("agent_id", {}, "field agent_id must be a non-empty string"),
+            (
+                "recipient_agent_id",
+                {},
+                "field recipient_agent_id must be a non-empty string or null",
+            ),
+        )
+        for field, value, expected in cases:
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                generate_dataset(
+                    root / "evidence",
+                    LabConfig(
+                        agents=20,
+                        messages=100,
+                        transcripts=30,
+                        participants=12,
+                        spoofed_tool_calls=0,
+                        coordinators=2,
+                        seed=9,
+                    ),
+                )
+                message_path = root / "evidence" / "messages.jsonl"
+                rows = [
+                    json.loads(row)
+                    for row in message_path.read_text(encoding="utf-8").splitlines()
+                ]
+                rows[0][field] = value
+                message_path.write_text(
+                    "\n".join(
+                        json.dumps(row, sort_keys=True, separators=(",", ":"))
+                        for row in rows
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+                argv = [
+                    "orbit-ir",
+                    "analyze",
+                    "--input",
+                    str(root / "evidence"),
+                    "--out",
+                    str(root / "results"),
+                ]
+                stderr = io.StringIO()
+                with (
+                    mock.patch("sys.argv", argv),
+                    contextlib.redirect_stderr(stderr),
+                    self.assertRaises(SystemExit) as raised,
+                ):
+                    cli.main()
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn(f"messages.jsonl:1: {expected}", stderr.getvalue())
+                self.assertNotIn("Traceback", stderr.getvalue())
+
     def test_generator_rejects_unsafe_zero_participant_configuration(self) -> None:
         with (
             tempfile.TemporaryDirectory() as temp,

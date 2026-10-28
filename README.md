@@ -95,7 +95,7 @@ The committed `artifacts/full_scale/` outputs were generated from this fixture. 
 - Detects missing transcript and control-plane records.
 - Detects duplicate tool-call and message identifiers instead of silently overwriting them.
 - Detects agent-identity and trace-identity disagreement across sources.
-- Validates JSON objects, required fields, and timezone-aware ISO-8601 timestamps with exact source-line errors.
+- Validates JSON objects, required non-empty string fields, optional recipient identifiers, and timezone-aware ISO-8601 timestamps with exact source-line errors.
 - Hashes each source with SHA-256 before parsing.
 - Emits source file and line references in findings and trajectories.
 - Normalizes the investigation window to UTC.
@@ -122,7 +122,7 @@ workload identity -> agent -> tool call -> credential -> resource -> effect -> c
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v    # 10 tests
+python3 -m unittest discover -s tests -v    # 11 tests
 pip install ruff==0.17.0 && ruff check .    # lint, rules in pyproject.toml
 ```
 
