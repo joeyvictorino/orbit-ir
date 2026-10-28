@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reject non-string or empty evidence identifiers with exact source-line errors instead of allowing uncaught type errors.
+
 ## 0.2.0
 
 - Removed the runtime dependency on `ground_truth.json`.

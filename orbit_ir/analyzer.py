@@ -60,6 +60,21 @@ def _iter_jsonl(path: Path) -> Iterable[tuple[int, dict]]:
                 raise EvidenceFormatError(
                     f"{path.name}:{line_number}: missing required fields: {', '.join(missing)}"
                 )
+            for field in sorted(required):
+                value = row[field]
+                if not isinstance(value, str) or not value:
+                    raise EvidenceFormatError(
+                        f"{path.name}:{line_number}: field {field} must be a non-empty string"
+                    )
+            if path.name == "messages.jsonl":
+                recipient = row.get("recipient_agent_id")
+                if recipient is not None and (
+                    not isinstance(recipient, str) or not recipient
+                ):
+                    raise EvidenceFormatError(
+                        f"{path.name}:{line_number}: field recipient_agent_id "
+                        "must be a non-empty string or null"
+                    )
             _parse_timestamp(row.get("timestamp"), f"{path.name}:{line_number}")
             yield line_number, row
 
