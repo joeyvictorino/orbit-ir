@@ -145,6 +145,10 @@ from .insider_threat import analyze as analyze_insider_threat, format_text as fo
 from .exfil_rate import analyze_exfil_rates, format_text as format_er_text, format_json as format_er_json, _load_events as _load_er_events
 from .event_cluster import analyze_event_clusters, format_text as format_ec_text, format_json as format_ec_json, _load_events as _load_ec_events
 from .tool_chain import analyze_tool_chains, format_text as format_tch_text, format_json as format_tch_json, _load_events as _load_tch_events
+from .privilege_chain import analyze as analyze_privilege_chain, format_text as format_pc_text, format_json as format_pc_json, _load_events as _load_pc_events
+from .resource_abuse import analyze as analyze_resource_abuse, format_text as format_ra_text, format_json as format_ra_json, _load_events as _load_ra_events
+from .event_timeline_gap import analyze_timeline_gaps, format_text as format_etg_text, format_json as format_etg_json, _load_events as _load_etg_events
+from .agent_handoff import analyze_handoffs, format_text as format_ah_text, format_json as format_ah_json, _load_events as _load_ah_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -988,6 +992,32 @@ def build_parser() -> argparse.ArgumentParser:
     er_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
     er_p.add_argument("--burst-threshold", type=int, default=10000, help="Bytes threshold for burst detection")
     er_p.add_argument("--window", type=int, default=300, help="Window size in seconds for burst detection")
+
+    pc_p = subparsers.add_parser("privilege-chain", help="Reconstruct privilege escalation chains from agent evidence")
+    pc_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    pc_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    pc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ra_p = subparsers.add_parser("resource-abuse", help="Detect resource abuse patterns in agent behavior")
+    ra_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ra_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ra_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    ra_p.add_argument("--api-threshold", type=int, default=10, help="API call count threshold for abuse detection")
+    ra_p.add_argument("--window", type=float, default=60.0, help="Time window in seconds for rate detection")
+    ra_p.add_argument("--storage-threshold", type=int, default=1000000, help="Storage threshold in bytes")
+    ra_p.add_argument("--bandwidth-threshold", type=int, default=5000000, help="Bandwidth threshold in bytes")
+
+    etg_p = subparsers.add_parser("event-timeline-gap", help="Detect suspicious gaps in event timelines")
+    etg_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    etg_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    etg_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    etg_p.add_argument("--min-gap", type=float, default=300.0, help="Minimum gap duration in seconds")
+
+    ah_p = subparsers.add_parser("agent-handoff", help="Analyze agent task handoff patterns and latencies")
+    ah_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ah_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ah_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    ah_p.add_argument("--handoff-gap", type=float, default=5.0, help="Maximum gap between events to count as a handoff")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2805,6 +2835,66 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Exfiltration rate analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "privilege-chain":
+        events, control = _load_pc_events(args.evidence_dir)
+        report = analyze_privilege_chain(events, control)
+        if args.format == "json":
+            output = format_pc_json(report)
+        else:
+            output = format_pc_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Privilege chain analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "event-timeline-gap":
+        events = _load_etg_events(args.evidence_dir)
+        report = analyze_timeline_gaps(events, min_gap_seconds=args.min_gap)
+        if args.format == "json":
+            output = format_etg_json(report)
+        else:
+            output = format_etg_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Timeline gap analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "agent-handoff":
+        events = _load_ah_events(args.evidence_dir)
+        report = analyze_handoffs(events, handoff_gap_seconds=args.handoff_gap)
+        if args.format == "json":
+            output = format_ah_json(report)
+        else:
+            output = format_ah_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Agent handoff analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "resource-abuse":
+        events, control = _load_ra_events(args.evidence_dir)
+        report = analyze_resource_abuse(events, control,
+                                         api_threshold=args.api_threshold,
+                                         window_seconds=args.window,
+                                         storage_threshold=args.storage_threshold,
+                                         bandwidth_threshold=args.bandwidth_threshold)
+        if args.format == "json":
+            output = format_ra_json(report)
+        else:
+            output = format_ra_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Resource abuse analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
