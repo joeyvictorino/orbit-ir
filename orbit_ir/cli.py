@@ -171,6 +171,8 @@ from .model_poisoning import analyze_model_poisoning, format_text as format_mp_t
 from .identity_spoof import analyze_identity_spoof, format_text as format_is_text, format_json as format_is_json, _load_events as _load_is_events
 from .dns_tunnel import analyze_dns_tunneling, format_text as format_dnst_text, format_json as format_dnst_json, _load_events as _load_dnst_events
 from .session_hijack import analyze_session_hijack, format_text as format_sh_text, format_json as format_sh_json, _load_events as _load_sh_events
+from .log_forging import analyze_log_forging, format_text as format_lf_text, format_json as format_lf_json, _load_events as _load_lf_events
+from .clock_manipulation import analyze_clock_manipulation, format_text as format_clk_text, format_json as format_clk_json, _load_events as _load_clk_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1155,6 +1157,16 @@ def build_parser() -> argparse.ArgumentParser:
     sh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     sh_p.add_argument("--format", choices=["text", "json"], default="text")
     sh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    lf_p = subparsers.add_parser("log-forging", help="Detect log injection and forging patterns")
+    lf_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    lf_p.add_argument("--format", choices=["text", "json"], default="text")
+    lf_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    clk_p = subparsers.add_parser("clock-manipulation", help="Detect timestamp and clock manipulation patterns")
+    clk_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    clk_p.add_argument("--format", choices=["text", "json"], default="text")
+    clk_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3340,6 +3352,32 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Session hijack analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "log-forging":
+        report = analyze_log_forging(args.evidence_dir)
+        if args.format == "json":
+            output = format_lf_json(report)
+        else:
+            output = format_lf_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Log forging analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "clock-manipulation":
+        report = analyze_clock_manipulation(args.evidence_dir)
+        if args.format == "json":
+            output = format_clk_json(report)
+        else:
+            output = format_clk_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Clock manipulation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
