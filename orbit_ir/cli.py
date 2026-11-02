@@ -137,6 +137,8 @@ from .event_graph import analyze_event_graph, format_text as format_eg_text, for
 from .chain_of_thought import analyze_chain_of_thought, format_text as format_cot_text, format_json as format_cot_json, _load_events as _load_cot_events
 from .alert_fatigue import analyze_alert_fatigue, format_text as format_af_text, format_json as format_af_json, _load_events as _load_af_events
 from .decision_tree import analyze_decision_tree, format_text as format_dt_text, format_json as format_dt_json, _load_events as _load_dt_events
+from .log_anomaly import analyze_log_anomalies, format_text as format_la_text, format_json as format_la_json, _load_events as _load_la_events
+from .agent_drift import analyze_agent_drift, format_text as format_ad_text, format_json as format_ad_json, _load_events as _load_ad_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -931,6 +933,16 @@ def build_parser() -> argparse.ArgumentParser:
     dt_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     dt_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     dt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    la_p = subparsers.add_parser("log-anomaly", help="Detect anomalous patterns in agent log evidence")
+    la_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    la_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    la_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ad_p = subparsers.add_parser("agent-drift", help="Detect behavioral drift in agent actions over time")
+    ad_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ad_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ad_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2636,6 +2648,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Decision tree analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "log-anomaly":
+        events, control = _load_la_events(args.evidence_dir)
+        report = analyze_log_anomalies(events, control)
+        if args.format == "json":
+            output = format_la_json(report)
+        else:
+            output = format_la_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Log anomaly analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "agent-drift":
+        events, control = _load_ad_events(args.evidence_dir)
+        report = analyze_agent_drift(events, control)
+        if args.format == "json":
+            output = format_ad_json(report)
+        else:
+            output = format_ad_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Agent drift analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
