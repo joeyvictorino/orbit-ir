@@ -459,6 +459,57 @@ class LabTest(unittest.TestCase):
             for agent_id in agents_in_graph:
                 self.assertIn(agent_id, report)
 
+    def test_agent_clusters_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            self.assertIn("agent_clusters", summary["findings"])
+            self.assertGreater(summary["findings"]["agent_clusters"], 0)
+
+            clusters = json.loads((results_dir / "clusters.json").read_text())
+            self.assertIsInstance(clusters, list)
+            self.assertGreater(len(clusters), 0)
+            for cluster in clusters:
+                self.assertIn("agents", cluster)
+                self.assertIn("shared_credentials", cluster)
+                self.assertIn("board_messages", cluster)
+                self.assertIn("size", cluster)
+                self.assertGreaterEqual(cluster["size"], 2)
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Agent clusters", report)
+            self.assertIn("clusters.json", report)
+
+    def test_agent_clusters_empty_when_no_links(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        clusters = _detect_agent_clusters({}, [], {"a", "b", "c"})
+        self.assertEqual(clusters, [])
+
+    def test_agent_clusters_from_shared_credential(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        cred_agents: dict[str, set[str]] = {"cred-1": {"agent-a", "agent-b"}}
+        clusters = _detect_agent_clusters(cred_agents, [], {"agent-a", "agent-b", "agent-c"})
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(set(clusters[0]["agents"]), {"agent-a", "agent-b"})
+        self.assertEqual(clusters[0]["shared_credentials"], ["cred-1"])
+
+    def test_agent_clusters_from_board_edges(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        edges = [("agent-x", "agent-y"), ("agent-x", "agent-y")]
+        clusters = _detect_agent_clusters({}, edges, {"agent-x", "agent-y", "agent-z"})
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(set(clusters[0]["agents"]), {"agent-x", "agent-y"})
+        self.assertEqual(clusters[0]["board_messages"], 2)
+
     def test_trajectory_graph_empty_when_no_trajectories(self) -> None:
         from orbit_ir.analyzer import _render_trajectory_graph
         self.assertEqual(_render_trajectory_graph([]), "")

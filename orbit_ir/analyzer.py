@@ -236,6 +236,7 @@ def analyze_dataset(
 
     all_agents: set[str] = set()
     board_participants: set[str] = set()
+    board_edges: list[tuple[str, str]] = []
     assignment_counts: Counter[str] = Counter()
     seen_message_ids: dict[str, int] = {}
     duplicate_message_ids: list[dict] = []
@@ -265,6 +266,7 @@ def analyze_dataset(
             board_participants.add(event["agent_id"])
             if event.get("recipient_agent_id"):
                 board_participants.add(event["recipient_agent_id"])
+                board_edges.append((event["agent_id"], event["recipient_agent_id"]))
             if event["message_type"] == "assignment":
                 assignment_counts[event["agent_id"]] += 1
                 timeline_events.append({
@@ -406,6 +408,8 @@ def analyze_dataset(
         if len(agents_set) > 1
     )
 
+    agent_clusters = _detect_agent_clusters(credential_agents, board_edges, all_agents)
+
     coordinator_ranking = [
         {"agent_id": agent, "assignment_count": count}
         for agent, count in assignment_counts.most_common()
@@ -470,6 +474,7 @@ def analyze_dataset(
             "coordinators_over_threshold": len(detected_coordinators),
             "trajectory_records": len(trajectories),
             "shared_credentials": len(shared_credentials),
+            "agent_clusters": len(agent_clusters),
             "reason_counts": dict(sorted(reason_counts.items())),
             "confidence_bands": {"high": confidence_bands.get("high", 0), "medium": confidence_bands.get("medium", 0), "low": confidence_bands.get("low", 0)},
             "average_confidence_score": avg_confidence,
@@ -562,6 +567,10 @@ def analyze_dataset(
         json.dumps(credential_reuse_records, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "clusters.json").write_text(
+        json.dumps(agent_clusters, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "timeline.json").write_text(
         json.dumps(timeline_events, indent=2, sort_keys=True) + "\n", encoding="utf-8",
     )
@@ -583,7 +592,7 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories)
+    report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
 
@@ -639,6 +648,82 @@ def _render_trajectory_graph(trajectories: list[dict]) -> str:
     lines.append(f"{len(trajectories):,} trajectories across {len(agents):,} agents. "
                  "Red = high confidence, orange = medium, grey = low. "
                  "Full trajectory data is in `trajectories.json`.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _detect_agent_clusters(
+    credential_agents: dict[str, set[str]],
+    board_edges: list[tuple[str, str]],
+    all_agents: set[str],
+) -> list[dict]:
+    parent: dict[str, str] = {a: a for a in all_agents}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for cred, agents_set in credential_agents.items():
+        agents_list = sorted(agents_set)
+        for i in range(1, len(agents_list)):
+            union(agents_list[0], agents_list[i])
+
+    for a, b in board_edges:
+        if a in parent and b in parent:
+            union(a, b)
+
+    groups: dict[str, set[str]] = defaultdict(set)
+    for agent in all_agents:
+        groups[find(agent)].add(agent)
+
+    edge_counts: Counter[tuple[str, ...]] = Counter()
+    for a, b in board_edges:
+        key = tuple(sorted([a, b]))
+        edge_counts[key] += 1
+
+    clusters = []
+    for root, members in sorted(groups.items(), key=lambda x: -len(x[1])):
+        if len(members) < 2:
+            continue
+        shared = sorted(
+            cred for cred, agents_set in credential_agents.items()
+            if len(agents_set & members) > 1
+        )
+        board_msg_count = sum(
+            count for (a, b), count in edge_counts.items()
+            if a in members and b in members
+        )
+        clusters.append({
+            "agents": sorted(members),
+            "shared_credentials": shared,
+            "board_messages": board_msg_count,
+            "size": len(members),
+        })
+    return clusters
+
+
+def _render_clusters(clusters: list[dict]) -> str:
+    if not clusters:
+        return ""
+    lines = ["## Agent clusters", ""]
+    lines.append(f"{len(clusters):,} cluster(s) of agents linked by shared credentials or board communication.")
+    lines.append("")
+    lines.append("| Cluster | Agents | Shared credentials | Board messages |")
+    lines.append("| --- | ---: | ---: | ---: |")
+    for i, c in enumerate(clusters, 1):
+        agent_list = ", ".join(c["agents"][:5])
+        if len(c["agents"]) > 5:
+            agent_list += f" (+{len(c['agents']) - 5})"
+        lines.append(f"| C{i} | {c['size']:,} ({agent_list}) | {len(c['shared_credentials']):,} | {c['board_messages']:,} |")
+    lines.append("")
+    lines.append("Clusters are connected components in a graph where edges are shared credentials and board messages. Full data is in `clusters.json`.")
     lines.append("")
     return "\n".join(lines)
 
@@ -767,7 +852,7 @@ def _render_statistics_table(findings_summary: dict) -> str:
     return "\n".join(lines)
 
 
-def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None) -> str:
+def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None, clusters: list[dict] | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
     files = "\n".join(
@@ -822,6 +907,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 {_render_statistics_table(findings)}
 {_render_timeline(timeline_events or [])}
 {_render_trajectory_graph(trajectories or [])}
+{_render_clusters(clusters or [])}
 {_render_mitre_section(findings)}
 {_render_data_quality(data_quality or {})}
 {evaluation_section}
