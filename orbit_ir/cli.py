@@ -48,7 +48,10 @@ from .chain import parse_chain, run_chain, format_chain_text
 from .sample import sample_evidence, format_sample_text
 from .anonymize import anonymize_evidence, format_anonymize_text
 from .inspect import list_events, inspect_event, format_inspect_text
+from .pivot import pivot_events, format_pivot_text
 from .redact import redact_evidence, format_redact_text
+from .batch import parse_batch_file, run_batch, format_batch_text
+from .diff_agents import diff_agents, format_diff_agents_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -338,6 +341,18 @@ def build_parser() -> argparse.ArgumentParser:
     rdc.add_argument("--output", type=Path, required=True, help="Output directory for redacted evidence")
     rdc.add_argument("--pattern-file", type=Path, default=None, help="Custom patterns file (NAME: regex per line)")
     rdc.add_argument("--format", choices=["text", "json"], default="text")
+
+    bat = subparsers.add_parser("batch", help="Run multiple commands in sequence from a file")
+    bat.add_argument("--file", type=Path, required=True, help="Batch file (one command per line, or YAML)")
+    bat.add_argument("--var", action="append", default=[], metavar="KEY=VALUE",
+                     help="Variable substitution (repeatable, e.g. --var INPUT=/data)")
+    bat.add_argument("--format", choices=["text", "json"], default="text")
+
+    da = subparsers.add_parser("diff-agents", help="Behavioral delta analysis between two agents")
+    da.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    da.add_argument("--agent-a", required=True, help="First agent ID")
+    da.add_argument("--agent-b", required=True, help="Second agent ID")
+    da.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -694,6 +709,28 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_redact_text(result), end="")
+        return
+    elif args.command == "batch":
+        steps = parse_batch_file(args.file)
+        variables: dict[str, str] = {}
+        for v in args.var:
+            if "=" in v:
+                k, val = v.split("=", 1)
+                variables[k] = val
+        result = run_batch(steps, variables=variables if variables else None)
+        if args.format == "json":
+            print(json.dumps(result.to_dict(), sort_keys=True, indent=2))
+        else:
+            print(format_batch_text(result), end="")
+        if result.failed > 0:
+            raise SystemExit(1)
+        return
+    elif args.command == "diff-agents":
+        result = diff_agents(args.input, args.agent_a, args.agent_b)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_diff_agents_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
