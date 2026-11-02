@@ -5,7 +5,14 @@ import json
 import sys
 from pathlib import Path
 
-from .analyzer import analyze_dataset, build_navigator_layer, filter_findings, verify_evidence
+from .analyzer import (
+    analyze_dataset,
+    build_evidence_chain,
+    build_navigator_layer,
+    filter_findings,
+    verify_evidence,
+    verify_evidence_chain,
+)
 from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
@@ -68,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Export findings as a MITRE ATT&CK Navigator layer JSON file",
+    )
+    analyze.add_argument(
+        "--evidence-chain",
+        action="store_true",
+        default=False,
+        help="Regenerate and print the evidence chain JSON (cryptographic hash linking findings to evidence)",
     )
 
     verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
@@ -189,7 +202,10 @@ def _run(args: argparse.Namespace) -> None:
             (args.out / "summary.json").write_text(
                 json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-        if args.navigator_layer:
+        if args.evidence_chain:
+            chain_path = args.out / "evidence_chain.json"
+            print(chain_path.read_text(encoding="utf-8"), end="")
+        elif args.navigator_layer:
             findings_path = args.out / "findings.json"
             layer_findings = json.loads(findings_path.read_text(encoding="utf-8"))
             layer = build_navigator_layer(layer_findings)

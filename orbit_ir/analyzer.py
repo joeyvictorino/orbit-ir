@@ -380,6 +380,73 @@ def build_navigator_layer(findings: list[dict], name: str = "orbit-ir") -> dict:
     }
 
 
+def evidence_stats(input_dir: Path) -> dict:
+    """Return a quick summary of the evidence dataset without running analysis."""
+    for name in EVIDENCE_FILES:
+        if not (input_dir / name).is_file():
+            raise FileNotFoundError(f"missing evidence source: {name}")
+
+    agents: set[str] = set()
+    channels: set[str] = set()
+    message_types: set[str] = set()
+    message_count = 0
+    msg_timestamps: list[str] = []
+    for _, row in _iter_jsonl(input_dir / "messages.jsonl"):
+        message_count += 1
+        agents.add(row["agent_id"])
+        if row.get("recipient_agent_id"):
+            agents.add(row["recipient_agent_id"])
+        channels.add(row.get("channel", "unknown"))
+        message_types.add(row.get("message_type", "unknown"))
+        msg_timestamps.append(row["timestamp"])
+
+    tool_names: set[str] = set()
+    transcript_count = 0
+    transcript_agents: set[str] = set()
+    for _, row in _iter_jsonl(input_dir / "transcripts.jsonl"):
+        transcript_count += 1
+        tool_names.add(row.get("claimed_tool", "unknown"))
+        transcript_agents.add(row["agent_id"])
+
+    control_count = 0
+    actual_tools: set[str] = set()
+    credentials: set[str] = set()
+    resources: set[str] = set()
+    for _, row in _iter_jsonl(input_dir / "control_plane.jsonl"):
+        control_count += 1
+        actual_tools.add(row.get("actual_tool", "unknown"))
+        if row.get("credential_id"):
+            credentials.add(row["credential_id"])
+        if row.get("resource"):
+            resources.add(row["resource"])
+
+    date_range = None
+    if msg_timestamps:
+        sorted_ts = sorted(msg_timestamps)
+        date_range = {"earliest": sorted_ts[0], "latest": sorted_ts[-1]}
+
+    file_sizes = {}
+    for name in EVIDENCE_FILES:
+        p = input_dir / name
+        file_sizes[name] = p.stat().st_size
+
+    return {
+        "agents": sorted(agents),
+        "agent_count": len(agents),
+        "messages": message_count,
+        "transcripts": transcript_count,
+        "control_plane_events": control_count,
+        "channels": sorted(channels),
+        "message_types": sorted(message_types),
+        "claimed_tools": sorted(tool_names),
+        "actual_tools": sorted(actual_tools),
+        "unique_credentials": len(credentials),
+        "unique_resources": len(resources),
+        "date_range": date_range,
+        "file_sizes": file_sizes,
+    }
+
+
 def analyze_dataset(
     input_dir: Path,
     output_dir: Path,
@@ -817,6 +884,11 @@ def analyze_dataset(
         json.dumps(layer, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
+    evidence_chain = build_evidence_chain(findings, transcripts_by_call, controls_by_call)
+    (output_dir / "evidence_chain.json").write_text(
+        json.dumps(evidence_chain, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
     report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters, lateral_movement)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
 
@@ -825,6 +897,163 @@ def analyze_dataset(
     html_content = render_html_report(report, title=f"ORBIT Analysis — {output_dir.name}")
     (output_dir / "report.html").write_text(html_content, encoding="utf-8")
     return summary
+
+
+def build_evidence_chain(
+    findings: list[dict],
+    transcripts_by_call: dict[str, list[tuple[int, dict]]],
+    controls_by_call: dict[str, list[tuple[int, dict]]],
+) -> dict:
+    """Build a cryptographic evidence chain linking findings to source records.
+
+    Each finding is linked to its supporting transcript and control-plane
+    evidence entries.  Every evidence entry is hashed (SHA-256 of its
+    canonical JSON), and a per-detection chain hash covers the ordered
+    concatenation of evidence hashes.  A root hash covers all chain hashes,
+    enabling tamper detection over the full document.
+    """
+    chain: list[dict] = []
+    all_chain_hashes: list[str] = []
+
+    for f in findings:
+        tcid = f.get("tool_call_id", "")
+        evidence_entries: list[dict] = []
+        evidence_hashes: list[str] = []
+
+        for line_number, record in transcripts_by_call.get(tcid, []):
+            canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+            h = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            evidence_entries.append({
+                "source": "transcripts.jsonl",
+                "line": line_number,
+                "event_hash": f"sha256:{h}",
+                "agent": record.get("agent_id", ""),
+                "action": record.get("claimed_tool", ""),
+                "timestamp": record.get("timestamp", ""),
+            })
+            evidence_hashes.append(h)
+
+        for line_number, record in controls_by_call.get(tcid, []):
+            canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+            h = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            evidence_entries.append({
+                "source": "control_plane.jsonl",
+                "line": line_number,
+                "event_hash": f"sha256:{h}",
+                "agent": record.get("agent_id", ""),
+                "action": record.get("actual_tool", ""),
+                "timestamp": record.get("timestamp", ""),
+            })
+            evidence_hashes.append(h)
+
+        chain_input = "".join(evidence_hashes)
+        chain_hash = hashlib.sha256(chain_input.encode("utf-8")).hexdigest()
+        all_chain_hashes.append(chain_hash)
+
+        primary_reasons = f.get("reasons", [])
+        detection_type = primary_reasons[0] if primary_reasons else "unknown"
+
+        chain.append({
+            "detection_id": f.get("finding_id", ""),
+            "detection_type": detection_type,
+            "severity": f.get("severity", "low"),
+            "tool_call_id": tcid,
+            "evidence": evidence_entries,
+            "chain_hash": f"sha256:{chain_hash}",
+        })
+
+    root_input = "".join(all_chain_hashes)
+    root_hash = hashlib.sha256(root_input.encode("utf-8")).hexdigest()
+
+    return {
+        "version": "1.0",
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "detections": len(chain),
+        "chain": chain,
+        "root_hash": f"sha256:{root_hash}",
+    }
+
+
+def verify_evidence_chain(
+    chain_doc: dict,
+    transcripts_by_call: dict[str, list[tuple[int, dict]]],
+    controls_by_call: dict[str, list[tuple[int, dict]]],
+) -> dict:
+    """Verify an evidence chain document against source records.
+
+    Re-hashes each evidence entry from the original data and compares
+    against the stored hashes.  Returns a dict with ``valid`` (bool)
+    and ``mismatches`` (list of issues found).
+    """
+    mismatches: list[dict] = []
+    recomputed_chain_hashes: list[str] = []
+
+    for entry in chain_doc.get("chain", []):
+        tcid = entry.get("tool_call_id", "")
+        evidence_hashes: list[str] = []
+
+        transcript_records = {
+            ln: rec for ln, rec in transcripts_by_call.get(tcid, [])
+        }
+        control_records = {
+            ln: rec for ln, rec in controls_by_call.get(tcid, [])
+        }
+
+        for ev in entry.get("evidence", []):
+            source = ev.get("source", "")
+            line = ev.get("line", 0)
+            stored_hash = ev.get("event_hash", "")
+
+            if source == "transcripts.jsonl":
+                record = transcript_records.get(line)
+            elif source == "control_plane.jsonl":
+                record = control_records.get(line)
+            else:
+                record = None
+
+            if record is None:
+                mismatches.append({
+                    "detection_id": entry.get("detection_id", ""),
+                    "kind": "missing_record",
+                    "detail": f"no record at {source}:{line}",
+                })
+                evidence_hashes.append("")
+                continue
+
+            canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+            h = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            expected = f"sha256:{h}"
+            evidence_hashes.append(h)
+
+            if stored_hash != expected:
+                mismatches.append({
+                    "detection_id": entry.get("detection_id", ""),
+                    "kind": "hash_mismatch",
+                    "detail": f"{source}:{line}: expected {expected}, stored {stored_hash}",
+                })
+
+        chain_input = "".join(evidence_hashes)
+        recomputed = hashlib.sha256(chain_input.encode("utf-8")).hexdigest()
+        recomputed_chain_hashes.append(recomputed)
+        stored_chain = entry.get("chain_hash", "").removeprefix("sha256:")
+        if recomputed != stored_chain:
+            mismatches.append({
+                "detection_id": entry.get("detection_id", ""),
+                "kind": "chain_hash_mismatch",
+                "detail": f"recomputed sha256:{recomputed}, stored {entry.get('chain_hash', '')}",
+            })
+
+    root_input = "".join(recomputed_chain_hashes)
+    recomputed_root = hashlib.sha256(root_input.encode("utf-8")).hexdigest()
+    stored_root = chain_doc.get("root_hash", "").removeprefix("sha256:")
+    if recomputed_root != stored_root:
+        mismatches.append({
+            "detection_id": "_root",
+            "kind": "root_hash_mismatch",
+            "detail": f"recomputed sha256:{recomputed_root}, stored {chain_doc.get('root_hash', '')}",
+        })
+
+    return {"valid": len(mismatches) == 0, "mismatches": mismatches}
 
 
 def verify_evidence(
