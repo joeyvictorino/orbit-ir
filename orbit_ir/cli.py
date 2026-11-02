@@ -40,6 +40,8 @@ from .dashboard import generate_dashboard
 from .watch import watch_evidence
 from .convert import convert_jsonl_to_csv, convert_csv_to_jsonl, convert_evidence_dir, format_convert_text
 from .schema_def import validate_evidence_schema, format_schema_text, format_validation_text
+from .normalize import normalize_evidence, format_normalize_text
+from .tag import tag_events, list_tags, filter_by_tag, format_tag_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -258,6 +260,24 @@ def build_parser() -> argparse.ArgumentParser:
     es.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
     es.add_argument("--strict", action="store_true", default=False,
                     help="Treat unknown fields as errors instead of warnings")
+
+    norm = subparsers.add_parser("normalize", help="Normalize evidence fields (timestamps, agent IDs, whitespace)")
+    norm.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    norm.add_argument("--output", type=Path, required=True, help="Output directory for normalized evidence")
+    norm.add_argument("--rename", action="append", default=[], metavar="OLD=NEW",
+                      help="Rename a field (repeatable, e.g. --rename src_agent=agent_id)")
+    norm.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    tg = subparsers.add_parser("tag", help="Tag evidence events with custom labels")
+    tg.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    tg.add_argument("--output", type=Path, default=None, help="Output directory for tagged evidence")
+    tg.add_argument("--rule", action="append", default=[], metavar="FIELD=VALUE:TAG",
+                    help="Tagging rule (repeatable, e.g. --rule agent_id=a1:suspicious)")
+    tg.add_argument("--list", action="store_true", default=False, dest="list_tags",
+                    help="List existing tags in the evidence")
+    tg.add_argument("--filter", default=None, dest="filter_tag", metavar="TAG",
+                    help="Filter events to those with this tag")
+    tg.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -478,6 +498,60 @@ def _run(args: argparse.Namespace) -> None:
             return
         print("Use --print to display schemas or --validate DIR to validate evidence.", file=sys.stderr)
         raise SystemExit(2)
+    elif args.command == "normalize":
+        renames: dict[str, str] | None = None
+        if args.rename:
+            renames = {}
+            for r in args.rename:
+                if "=" not in r:
+                    print(f"error: invalid rename {r!r}, expected OLD=NEW", file=sys.stderr)
+                    raise SystemExit(2)
+                old, new = r.split("=", 1)
+                renames[old] = new
+        result = normalize_evidence(args.input, args.output, renames=renames)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_normalize_text(result), end="")
+        return
+    elif args.command == "tag":
+        if args.list_tags:
+            result = list_tags(args.input)
+            if args.format == "json":
+                print(json.dumps(result, sort_keys=True, indent=2))
+            else:
+                for tag in result.get("unique_tags", []):
+                    count = result["total_tags"].get(tag, 0)
+                    print(f"  {tag}: {count}")
+            return
+        if args.filter_tag:
+            events = filter_by_tag(args.input, args.filter_tag)
+            if args.format == "json":
+                print(json.dumps(events, sort_keys=True, indent=2, default=str))
+            else:
+                for e in events:
+                    src = e.pop("_source_file", "")
+                    agent = e.get("agent_id", "?")
+                    ts = e.get("timestamp", "")
+                    print(f"  [{src}] {ts} agent={agent} tags={e.get('tags', [])}")
+            return
+        if not args.output:
+            print("error: --output is required when tagging (use --list or --filter for read-only)", file=sys.stderr)
+            raise SystemExit(2)
+        rules_list: list[dict] = []
+        for r in args.rule:
+            if ":" not in r or "=" not in r:
+                print(f"error: invalid rule {r!r}, expected FIELD=VALUE:TAG", file=sys.stderr)
+                raise SystemExit(2)
+            field_value, tag = r.rsplit(":", 1)
+            field, value = field_value.split("=", 1)
+            rules_list.append({field: value, "tag": tag})
+        result = tag_events(args.input, args.output, rules_list)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_tag_text(result), end="")
+        return
     elif args.command == "analyze":
         summary = analyze_dataset(
             args.input,
