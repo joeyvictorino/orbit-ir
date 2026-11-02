@@ -258,6 +258,40 @@ def _finding(
     }
 
 
+CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+
+def filter_findings(
+    findings: list[dict],
+    *,
+    min_confidence: str | None = None,
+    detection_types: list[str] | None = None,
+    agents: list[str] | None = None,
+) -> list[dict]:
+    """Filter a findings list by confidence, detection type, and/or agent."""
+    result = findings
+    if min_confidence is not None:
+        threshold = CONFIDENCE_ORDER.get(min_confidence, 0)
+        result = [
+            f for f in result
+            if CONFIDENCE_ORDER.get(f.get("confidence", "low"), 0) >= threshold
+        ]
+    if detection_types is not None:
+        type_set = set(detection_types)
+        result = [
+            f for f in result
+            if type_set & set(f.get("reasons", []))
+        ]
+    if agents is not None:
+        agent_set = set(agents)
+        result = [
+            f for f in result
+            if f.get("agent_id_transcript") in agent_set
+            or f.get("agent_id_control") in agent_set
+        ]
+    return result
+
+
 def analyze_dataset(
     input_dir: Path,
     output_dir: Path,

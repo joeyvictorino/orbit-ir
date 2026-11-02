@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .analyzer import analyze_dataset, verify_evidence
+from .analyzer import analyze_dataset, filter_findings, verify_evidence
 from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
@@ -40,6 +40,22 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["json", "sarif", "html"],
         default="json",
         help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0, html prints the HTML report",
+    )
+    analyze.add_argument(
+        "--min-confidence",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Only include findings at or above this confidence level",
+    )
+    analyze.add_argument(
+        "--detection-type",
+        default=None,
+        help="Comma-separated detection types to include (e.g. tool-name-mismatch,unbacked-completion)",
+    )
+    analyze.add_argument(
+        "--agent",
+        default=None,
+        help="Comma-separated agent IDs to filter findings to",
     )
 
     verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
@@ -129,6 +145,35 @@ def _run(args: argparse.Namespace) -> None:
             ground_truth_path=args.ground_truth,
             coordinator_min_assignments=args.coordinator_min_assignments,
         )
+        has_filters = (
+            args.min_confidence is not None
+            or args.detection_type is not None
+            or args.agent is not None
+        )
+        if has_filters:
+            findings_path = args.out / "findings.json"
+            all_findings = json.loads(findings_path.read_text(encoding="utf-8"))
+            detection_types = args.detection_type.split(",") if args.detection_type else None
+            agents = args.agent.split(",") if args.agent else None
+            filtered = filter_findings(
+                all_findings,
+                min_confidence=args.min_confidence,
+                detection_types=detection_types,
+                agents=agents,
+            )
+            findings_path.write_text(
+                json.dumps(filtered, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            summary["filter"] = {
+                "min_confidence": args.min_confidence,
+                "detection_types": detection_types,
+                "agents": agents,
+                "total_before_filter": len(all_findings),
+                "total_after_filter": len(filtered),
+            }
+            (args.out / "summary.json").write_text(
+                json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
         if args.format == "sarif":
             sarif_path = args.out / "findings.sarif"
             print(sarif_path.read_text(encoding="utf-8"), end="")
