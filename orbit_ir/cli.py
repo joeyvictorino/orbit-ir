@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only include findings at or above this confidence level",
     )
     analyze.add_argument(
+        "--min-severity",
+        choices=["low", "medium", "high", "critical"],
+        default=None,
+        help="Only include findings at or above this severity level",
+    )
+    analyze.add_argument(
         "--detection-type",
         default=None,
         help="Comma-separated detection types to include (e.g. tool-name-mismatch,unbacked-completion)",
@@ -147,6 +153,7 @@ def _run(args: argparse.Namespace) -> None:
         )
         has_filters = (
             args.min_confidence is not None
+            or args.min_severity is not None
             or args.detection_type is not None
             or args.agent is not None
         )
@@ -158,6 +165,7 @@ def _run(args: argparse.Namespace) -> None:
             filtered = filter_findings(
                 all_findings,
                 min_confidence=args.min_confidence,
+                min_severity=args.min_severity,
                 detection_types=detection_types,
                 agents=agents,
             )
@@ -166,6 +174,7 @@ def _run(args: argparse.Namespace) -> None:
             )
             summary["filter"] = {
                 "min_confidence": args.min_confidence,
+                "min_severity": args.min_severity,
                 "detection_types": detection_types,
                 "agents": agents,
                 "total_before_filter": len(all_findings),

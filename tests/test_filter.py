@@ -8,8 +8,41 @@ from pathlib import Path
 from unittest import mock
 
 from orbit_ir import cli
-from orbit_ir.analyzer import analyze_dataset, filter_findings
+from orbit_ir.analyzer import (
+    SEVERITY_ORDER,
+    _finding_severity,
+    analyze_dataset,
+    filter_findings,
+)
 from orbit_ir.generator import LabConfig, generate_dataset
+
+
+class FindingSeverityTest(unittest.TestCase):
+    def test_critical_from_spoofed(self) -> None:
+        self.assertEqual(_finding_severity(["tool-name-mismatch"]), "critical")
+        self.assertEqual(_finding_severity(["argument-digest-mismatch"]), "critical")
+
+    def test_high_from_unbacked(self) -> None:
+        self.assertEqual(_finding_severity(["unbacked-completion"]), "high")
+        self.assertEqual(_finding_severity(["oracle-integrity-violation"]), "high")
+        self.assertEqual(_finding_severity(["lateral-resource-access"]), "high")
+
+    def test_medium_from_identity(self) -> None:
+        self.assertEqual(_finding_severity(["agent-id-mismatch"]), "medium")
+        self.assertEqual(_finding_severity(["trace-id-mismatch"]), "medium")
+        self.assertEqual(_finding_severity(["missing-transcript"]), "medium")
+
+    def test_low_from_shared_cred(self) -> None:
+        self.assertEqual(_finding_severity(["shared-credential"]), "low")
+
+    def test_max_severity_wins(self) -> None:
+        self.assertEqual(
+            _finding_severity(["missing-transcript", "tool-name-mismatch"]),
+            "critical",
+        )
+
+    def test_empty_reasons(self) -> None:
+        self.assertEqual(_finding_severity([]), "low")
 
 
 class FilterFindingsTest(unittest.TestCase):
@@ -21,6 +54,7 @@ class FilterFindingsTest(unittest.TestCase):
                 "agent_id_transcript": "agent-a",
                 "agent_id_control": "agent-a",
                 "reasons": ["tool-name-mismatch", "argument-digest-mismatch"],
+                "severity": "critical",
                 "confidence": "high",
                 "confidence_score": 0.90,
             },
@@ -30,6 +64,7 @@ class FilterFindingsTest(unittest.TestCase):
                 "agent_id_transcript": "agent-b",
                 "agent_id_control": "agent-b",
                 "reasons": ["unbacked-completion"],
+                "severity": "high",
                 "confidence": "medium",
                 "confidence_score": 0.65,
             },
@@ -39,6 +74,7 @@ class FilterFindingsTest(unittest.TestCase):
                 "agent_id_transcript": "agent-c",
                 "agent_id_control": "agent-c",
                 "reasons": ["missing-transcript"],
+                "severity": "medium",
                 "confidence": "low",
                 "confidence_score": 0.40,
             },
@@ -48,6 +84,7 @@ class FilterFindingsTest(unittest.TestCase):
                 "agent_id_transcript": "agent-a",
                 "agent_id_control": "agent-d",
                 "reasons": ["agent-id-mismatch"],
+                "severity": "medium",
                 "confidence": "medium",
                 "confidence_score": 0.70,
             },
@@ -126,6 +163,66 @@ class FilterFindingsTest(unittest.TestCase):
         )
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["finding_id"], "finding-000001")
+
+    def test_min_severity_critical(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="critical")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["finding_id"], "finding-000001")
+
+    def test_min_severity_high(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="high")
+        self.assertEqual(len(result), 2)
+        ids = {f["finding_id"] for f in result}
+        self.assertEqual(ids, {"finding-000001", "finding-000002"})
+
+    def test_min_severity_medium(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="medium")
+        self.assertEqual(len(result), 4)
+
+    def test_min_severity_low_returns_all(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="low")
+        self.assertEqual(len(result), 4)
+
+    def test_severity_and_confidence_combined(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="high", min_confidence="medium")
+        self.assertEqual(len(result), 2)
+        ids = {f["finding_id"] for f in result}
+        self.assertEqual(ids, {"finding-000001", "finding-000002"})
+
+    def test_min_severity_critical(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="critical")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["finding_id"], "finding-000001")
+
+    def test_min_severity_high(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="high")
+        self.assertEqual(len(result), 2)
+        ids = {f["finding_id"] for f in result}
+        self.assertEqual(ids, {"finding-000001", "finding-000002"})
+
+    def test_min_severity_medium(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="medium")
+        self.assertEqual(len(result), 4)
+
+    def test_min_severity_low_returns_all(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="low")
+        self.assertEqual(len(result), 4)
+
+    def test_min_severity_combined_with_confidence(self) -> None:
+        findings = self._make_findings()
+        result = filter_findings(findings, min_severity="high", min_confidence="medium")
+        self.assertEqual(len(result), 2)
+        ids = {f["finding_id"] for f in result}
+        self.assertEqual(ids, {"finding-000001", "finding-000002"})
 
     def test_no_match_returns_empty(self) -> None:
         findings = self._make_findings()
@@ -240,6 +337,38 @@ class FilterCLIIntegrationTest(unittest.TestCase):
                     f.get("agent_id_transcript") == target_agent
                     or f.get("agent_id_control") == target_agent,
                 )
+
+    def test_cli_min_severity_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+
+            args = cli.build_parser().parse_args([
+                "analyze",
+                "--input", str(evidence_dir),
+                "--out", str(results_dir),
+                "--min-severity", "high",
+            ])
+            cli._run(args)
+
+            summary = json.loads((results_dir / "summary.json").read_text())
+            self.assertIn("filter", summary)
+            self.assertEqual(summary["filter"]["min_severity"], "high")
+            self.assertGreaterEqual(
+                summary["filter"]["total_before_filter"],
+                summary["filter"]["total_after_filter"],
+            )
+
+            filtered_findings = json.loads((results_dir / "findings.json").read_text())
+            for f in filtered_findings:
+                self.assertIn(f["severity"], ("high", "critical"))
 
     def test_no_filter_no_filter_key_in_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -22,6 +22,34 @@ MITRE_TECHNIQUES: dict[str, dict[str, str]] = {
     "missing-control-plane-event": {"id": "T1070", "name": "Indicator Removal"},
     "lateral-resource-access": {"id": "T1021", "name": "Remote Services"},
 }
+
+REASON_SEVERITY: dict[str, str] = {
+    "tool-name-mismatch": "critical",
+    "argument-digest-mismatch": "critical",
+    "lateral-resource-access": "high",
+    "unbacked-completion": "high",
+    "oracle-integrity-violation": "high",
+    "agent-id-mismatch": "medium",
+    "trace-id-mismatch": "medium",
+    "missing-transcript": "medium",
+    "missing-control-plane-event": "medium",
+    "shared-credential": "low",
+    "duplicate-transcript": "low",
+    "duplicate-control-event": "low",
+}
+
+SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def _finding_severity(reasons: list[str]) -> str:
+    best = 0
+    for r in reasons:
+        best = max(best, SEVERITY_ORDER.get(REASON_SEVERITY.get(r, "low"), 0))
+    for label, rank in SEVERITY_ORDER.items():
+        if rank == best:
+            return label
+    return "low"
+
 SOURCE_FIELDS = {
     "messages.jsonl": {
         "event_id", "timestamp", "agent_id", "channel", "message_type",
@@ -253,6 +281,7 @@ def _finding(
         "claimed_tool": transcript.get("claimed_tool"),
         "actual_tool": control.get("actual_tool"),
         "effect": control.get("effect"),
+        "severity": _finding_severity(reasons),
         "confidence": _confidence_label(score),
         "confidence_score": score,
     }
@@ -265,11 +294,18 @@ def filter_findings(
     findings: list[dict],
     *,
     min_confidence: str | None = None,
+    min_severity: str | None = None,
     detection_types: list[str] | None = None,
     agents: list[str] | None = None,
 ) -> list[dict]:
-    """Filter a findings list by confidence, detection type, and/or agent."""
+    """Filter a findings list by confidence, severity, detection type, and/or agent."""
     result = findings
+    if min_severity is not None:
+        threshold = SEVERITY_ORDER.get(min_severity, 0)
+        result = [
+            f for f in result
+            if SEVERITY_ORDER.get(f.get("severity", "low"), 0) >= threshold
+        ]
     if min_confidence is not None:
         threshold = CONFIDENCE_ORDER.get(min_confidence, 0)
         result = [
