@@ -127,6 +127,7 @@ from .trust_boundary import analyze_trust_boundaries, format_text as format_tb_t
 from .threat_model import analyze as analyze_threat_model, format_text as format_tm_text, format_json as format_tm_json
 from .capability_map import analyze_capability_map, format_text as format_cm_text, format_json as format_cm_json, _load_events as _load_cm_events
 from .session_stats import analyze as analyze_session_stats, format_text as format_ss_text, format_json as format_ss_json
+from .role_drift import analyze_role_drift, format_text as format_rd_text, format_json as format_rd_json, _load_events as _load_rd_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -858,6 +859,12 @@ def build_parser() -> argparse.ArgumentParser:
     cm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     cm_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     cm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rd_p = subparsers.add_parser("role-drift", help="Detect agent role drift from declared vs. observed behavior")
+    rd_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    rd_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    rd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    rd_p.add_argument("--role-map", type=str, default=None, help="JSON file mapping agent_id to expected role")
 
     tm_p = subparsers.add_parser("threat-model", help="Build STRIDE threat model from agent incident evidence")
     tm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
@@ -2403,6 +2410,24 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Capability map written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "role-drift":
+        events = _load_rd_events(str(args.evidence_dir))
+        role_map = None
+        if args.role_map:
+            import json as _json
+            role_map = _json.loads(Path(args.role_map).read_text())
+        report = analyze_role_drift(events, role_map=role_map)
+        if args.format == "json":
+            output = format_rd_json(report)
+        else:
+            output = format_rd_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Role drift analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
