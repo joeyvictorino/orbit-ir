@@ -155,6 +155,8 @@ from .evidence_replay import analyze as analyze_evidence_replay, format_text as 
 from .anomaly_correlate import analyze as analyze_anomaly_correlate, format_text as format_acorr_text, format_json as format_acorr_json
 from .policy_enforce import analyze as analyze_policy_enforce, format_text as format_penforce_text, format_json as format_penforce_json
 from .signal_noise import analyze as analyze_signal_noise, format_text as format_signoise_text, format_json as format_signoise_json
+from .social_engineering import analyze as analyze_social_eng, format_text as format_se_text, format_json as format_se_json, _load_events as _load_se_events
+from .timing_attack import analyze as analyze_timing_attack, format_text as format_ta_text, format_json as format_ta_json, _load_events as _load_ta_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1059,6 +1061,16 @@ def build_parser() -> argparse.ArgumentParser:
     signoise_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     signoise_p.add_argument("--format", choices=["text", "json"], default="text")
     signoise_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    se_p = subparsers.add_parser("social-engineering", help="Detect social engineering manipulation patterns")
+    se_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    se_p.add_argument("--format", choices=["text", "json"], default="text")
+    se_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ta_p = subparsers.add_parser("timing-attack", help="Detect timing-based attack patterns")
+    ta_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ta_p.add_argument("--format", choices=["text", "json"], default="text")
+    ta_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3018,6 +3030,36 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Signal-noise analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "social-engineering":
+        events = _load_se_events(args.evidence_dir / "transcripts.jsonl")
+        control = _load_se_events(args.evidence_dir / "control_plane.jsonl")
+        report = analyze_social_eng(events, control)
+        if args.format == "json":
+            output = format_se_json(report)
+        else:
+            output = format_se_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Social engineering analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "timing-attack":
+        events = _load_ta_events(args.evidence_dir / "transcripts.jsonl")
+        control = _load_ta_events(args.evidence_dir / "control_plane.jsonl")
+        report = analyze_timing_attack(events, control)
+        if args.format == "json":
+            output = format_ta_json(report)
+        else:
+            output = format_ta_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Timing attack analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
