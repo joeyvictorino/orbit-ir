@@ -1,238 +1,174 @@
-"""Tests for model theft / IP exfiltration detection."""
+"""Tests for model theft detection module."""
 import json
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from orbit_ir.model_theft import (
     analyze_model_theft,
     format_text,
     format_json,
-    _detect_weight_extraction,
-    _detect_distillation,
-    _detect_probing,
-    _detect_api_abuse,
-    _detect_artifact_exfil,
+    TheftReport,
     _load_events,
-    _classify_severity,
+    _event_text,
 )
 
 
-def _ev(content="", agent_id="agent-1", **kwargs):
-    e = {"content": content, "agent_id": agent_id, "timestamp": "2025-01-01T00:00:00Z"}
-    e.update(kwargs)
-    return e
-
-
-class TestDetectors:
-    def test_weight_extraction_detected(self):
-        ev = _ev("attempting weight extraction from production model")
-        found, matches, desc = _detect_weight_extraction(ev)
-        assert found
-        assert "weight extraction" in matches
-
-    def test_weight_extraction_via_tool(self):
-        ev = _ev("", tool="dump weights to disk")
-        found, matches, _ = _detect_weight_extraction(ev)
-        assert found
-        assert "dump weights" in matches
-
-    def test_weight_extraction_not_detected(self):
-        ev = _ev("normal inference request")
-        found, _, _ = _detect_weight_extraction(ev)
-        assert not found
-
-    def test_distillation_detected(self):
-        ev = _ev("running knowledge distillation with teacher-student setup")
-        found, matches, _ = _detect_distillation(ev)
-        assert found
-        assert "knowledge distillation" in matches
-
-    def test_distillation_via_args(self):
-        ev = _ev("", args={"task": "model cloning via logit matching"})
-        found, matches, _ = _detect_distillation(ev)
-        assert found
-
-    def test_probing_detected(self):
-        ev = _ev("running membership inference attack on target model")
-        found, matches, _ = _detect_probing(ev)
-        assert found
-        assert "membership inference" in matches
-
-    def test_probing_model_inversion(self):
-        ev = _ev("model inversion to extract training data representations")
-        found, matches, _ = _detect_probing(ev)
-        assert found
-
-    def test_api_abuse_detected(self):
-        ev = _ev("systematic query campaign to extract model knowledge")
-        found, matches, _ = _detect_api_abuse(ev)
-        assert found
-        assert "systematic query" in matches
-
-    def test_api_abuse_via_error(self):
-        ev = _ev("", error="rate limit bypass detected for bulk query")
-        found, matches, _ = _detect_api_abuse(ev)
-        assert found
-
-    def test_artifact_exfil_detected(self):
-        ev = _ev("exfiltrate model binary to external server")
-        found, matches, _ = _detect_artifact_exfil(ev)
-        assert found
-        assert "exfiltrate model" in matches
-
-    def test_artifact_exfil_not_detected(self):
-        ev = _ev("model performed well on benchmark")
-        found, _, _ = _detect_artifact_exfil(ev)
-        assert not found
-
-
-class TestClassifySeverity:
-    def test_weight_extraction_critical(self):
-        assert _classify_severity("weight-extraction", ["a", "b"]) == "critical"
-
-    def test_weight_extraction_high(self):
-        assert _classify_severity("weight-extraction", ["a"]) == "high"
-
-    def test_artifact_exfil_critical(self):
-        assert _classify_severity("artifact-exfiltration", ["a", "b"]) == "critical"
-
-    def test_distillation_high(self):
-        assert _classify_severity("distillation-attack", ["a"]) == "high"
-
-    def test_probing_medium(self):
-        assert _classify_severity("model-probing", ["a"]) == "medium"
-
-    def test_many_matches_high(self):
-        assert _classify_severity("api-abuse", ["a", "b", "c"]) == "high"
-
-
-class TestAnalyze:
-    def test_empty(self):
-        r = analyze_model_theft([])
-        assert r.summary.total_patterns == 0
-        assert len(r.patterns) == 0
-
-    def test_single_pattern(self):
-        events = [_ev("weight extraction attempt on gpt-4")]
-        r = analyze_model_theft(events)
-        assert r.summary.total_patterns == 1
-        assert r.patterns[0].theft_type == "weight-extraction"
-
-    def test_multiple_types(self):
-        events = [
-            _ev("weight extraction detected", agent_id="a1"),
-            _ev("knowledge distillation running", agent_id="a2"),
-            _ev("exfiltrate model to external", agent_id="a3"),
-        ]
-        r = analyze_model_theft(events)
-        assert r.summary.total_patterns == 3
-        types = {p.theft_type for p in r.patterns}
-        assert "weight-extraction" in types
-        assert "distillation-attack" in types
-        assert "artifact-exfiltration" in types
-
-    def test_dedup(self):
-        ev = _ev("weight extraction attempt", event_id="e1")
-        r = analyze_model_theft([ev, ev])
-        assert r.summary.total_patterns == 1
-
-    def test_control_events(self):
-        ctrl = [_ev("model weight dump initiated", agent_id="ctrl-agent")]
-        r = analyze_model_theft([], control_events=ctrl)
-        assert r.summary.total_patterns == 1
-        assert r.patterns[0].source_file == "control_plane.jsonl"
-
-    def test_theft_chain_escalation(self):
-        events = [
-            _ev("weight extraction from target", agent_id="thief"),
-            _ev("exfiltrate model binary", agent_id="thief"),
-        ]
-        r = analyze_model_theft(events)
-        for p in r.patterns:
-            assert p.severity == "critical"
-
-    def test_agents_involved(self):
-        events = [
-            _ev("weight extraction", agent_id="a1"),
-            _ev("distillation attack", agent_id="a2"),
-        ]
-        r = analyze_model_theft(events)
-        assert r.summary.agents_involved == 2
-        assert sorted(r.agents_involved) == ["a1", "a2"]
-
-    def test_models_targeted(self):
-        events = [
-            _ev("weight extraction", target_model="gpt-4"),
-            _ev("distillation attack", target_model="claude-3"),
-        ]
-        r = analyze_model_theft(events)
-        assert r.summary.models_targeted == 2
-
-    def test_severity_counts(self):
-        events = [
-            _ev("steal weights and dump weights", agent_id="a1"),
-            _ev("membership inference probe", agent_id="a2"),
-        ]
-        r = analyze_model_theft(events)
-        assert r.summary.critical_count >= 1 or r.summary.high_count >= 1
-
-
-class TestTheftChains:
-    def test_chain_detected(self):
-        events = [
-            _ev("weight extraction first", agent_id="a1", event_id="e1"),
-            _ev("then knowledge distillation", agent_id="a1", event_id="e2"),
-        ]
-        r = analyze_model_theft(events)
-        assert len(r.theft_chains) == 1
-        assert r.theft_chains[0]["agent_id"] == "a1"
-
-    def test_no_chain_single_pattern(self):
-        events = [_ev("weight extraction", agent_id="a1")]
-        r = analyze_model_theft(events)
-        assert len(r.theft_chains) == 0
+def _write_events(tmpdir: Path, events: list[dict], fname: str = "events.json") -> Path:
+    p = tmpdir / fname
+    p.write_text(json.dumps(events), encoding="utf-8")
+    return p
 
 
 class TestLoadEvents:
-    def test_load_from_file(self, tmp_path):
-        f = tmp_path / "events.jsonl"
-        f.write_text('{"content": "test"}\n{"content": "two"}\n')
-        events = _load_events(f)
-        assert len(events) == 2
-
-    def test_load_nonexistent(self, tmp_path):
-        events = _load_events(tmp_path / "nope.jsonl")
+    def test_empty_dir(self, tmp_path):
+        events = _load_events(str(tmp_path))
         assert events == []
 
-    def test_load_bad_json(self, tmp_path):
-        f = tmp_path / "events.jsonl"
-        f.write_text('{"good": true}\nnot json\n{"also": "good"}\n')
-        events = _load_events(f)
-        assert len(events) == 2
+    def test_single_file(self, tmp_path):
+        _write_events(tmp_path, [{"content": "hello"}])
+        events = _load_events(str(tmp_path))
+        assert len(events) == 1
+
+    def test_dict_file(self, tmp_path):
+        (tmp_path / "single.json").write_text(
+            json.dumps({"content": "single event"}), encoding="utf-8"
+        )
+        events = _load_events(str(tmp_path))
+        assert len(events) == 1
 
 
-class TestFormat:
-    def test_format_text_empty(self):
-        r = analyze_model_theft([])
-        text = format_text(r)
-        assert "No model theft" in text
+class TestEventText:
+    def test_content_field(self):
+        text = _event_text({"content": "Test content"})
+        assert "test content" in text
 
-    def test_format_text_with_patterns(self):
-        events = [_ev("weight extraction attempt")]
-        r = analyze_model_theft(events)
-        text = format_text(r)
+    def test_message_field(self):
+        text = _event_text({"message": "Some message"})
+        assert "some message" in text
+
+    def test_empty_event(self):
+        text = _event_text({})
+        assert text.strip() == ""
+
+
+class TestWeightExtraction:
+    def test_detects_weight_keywords(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "agent-1", "content": "Attempting to extract model weights from checkpoint"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 1
+        assert report.findings[0].category == "weight_extraction"
+        assert report.findings[0].severity == "critical"
+
+
+class TestArchitectureProbing:
+    def test_detects_probing(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "probe", "content": "Enumerating hidden layers and attention heads"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 1
+        assert report.findings[0].category == "architecture_probing"
+
+
+class TestDistillation:
+    def test_detects_distillation(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "student", "content": "Running knowledge distillation from teacher model"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 1
+        assert report.findings[0].category == "distillation"
+
+
+class TestDataExfiltration:
+    def test_detects_extraction(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "exfil", "content": "Training data extraction via memorization attack"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 1
+        assert report.findings[0].category == "data_exfiltration"
+
+
+class TestUnauthorizedAccess:
+    def test_detects_unauthorized(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "attacker", "content": "Unauthorized model access through api key theft"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 1
+        assert report.findings[0].category == "unauthorized_access"
+
+
+class TestAnalyzeModelTheft:
+    def test_empty_evidence(self, tmp_path):
+        report = analyze_model_theft(tmp_path)
+        assert report.total_events == 0
+        assert len(report.findings) == 0
+        assert report.risk_score == 0.0
+
+    def test_no_theft_events(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "a", "content": "Normal agent behavior"},
+            {"agent": "b", "content": "Just doing regular work"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 0
+
+    def test_multi_category(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "a", "content": "Extracting model weights from the checkpoint"},
+            {"agent": "b", "content": "Running knowledge distillation pipeline"},
+            {"agent": "c", "content": "Normal event"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert len(report.findings) == 2
+        assert report.by_category.get("weight_extraction", 0) == 1
+        assert report.by_category.get("distillation", 0) == 1
+
+    def test_risk_score_range(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "a", "content": "Stealing model weights"},
+            {"agent": "a", "content": "Training data extraction"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert 0 <= report.risk_score <= 1.0
+
+    def test_by_agent(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "attacker", "content": "Model weights extraction attempt"},
+            {"agent": "attacker", "content": "Knowledge distillation attempt"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        assert report.by_agent.get("attacker", 0) == 2
+
+
+class TestFormatText:
+    def test_header(self, tmp_path):
+        report = analyze_model_theft(tmp_path)
+        text = format_text(report)
         assert "Model Theft" in text
-        assert "weight-extraction" in text
+        assert "Risk score" in text
 
-    def test_format_json_valid(self):
-        events = [_ev("distillation attack running")]
-        r = analyze_model_theft(events)
-        out = format_json(r)
-        parsed = json.loads(out)
-        assert "summary" in parsed
-        assert "patterns" in parsed
-        assert parsed["summary"]["total_patterns"] >= 1
+    def test_findings_in_output(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "a", "content": "Model weights dump detected"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        text = format_text(report)
+        assert "weight_extraction" in text
 
-    def test_format_json_empty(self):
-        r = analyze_model_theft([])
-        parsed = json.loads(format_json(r))
-        assert parsed["summary"]["total_patterns"] == 0
+
+class TestFormatJSON:
+    def test_valid_json(self, tmp_path):
+        _write_events(tmp_path, [
+            {"agent": "a", "content": "Model checkpoint steal"},
+        ])
+        report = analyze_model_theft(tmp_path)
+        data = json.loads(format_json(report))
+        assert "findings" in data
+        assert "risk_score" in data
