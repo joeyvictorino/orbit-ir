@@ -132,6 +132,8 @@ from .deception_detect import analyze_deception, format_text as format_deception
 from .goal_drift import analyze_goal_drift, format_text as format_goaldrift_text, format_json as format_goaldrift_json, _load_events as _load_goaldrift_events
 from .steganography import analyze_steganography, format_text as format_stego_text, format_json as format_stego_json, _load_events as _load_stego_events
 from .behavior_cluster import analyze_behavior_clusters, format_text as format_cluster_text, format_json as format_cluster_json, _load_events as _load_cluster_events
+from .token_trace import analyze_token_trace, format_text as format_tt_text, format_json as format_tt_json, _load_events as _load_tt_events
+from .event_graph import analyze_event_graph, format_text as format_eg_text, format_json as format_eg_json, _load_events as _load_eg_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -901,6 +903,16 @@ def build_parser() -> argparse.ArgumentParser:
     goaldrift_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     goaldrift_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
     goaldrift_p.add_argument("--window-size", type=int, default=10, help="Sliding window size for goal state analysis")
+
+    tt_p = subparsers.add_parser("token-trace", help="Trace token usage patterns and detect anomalous consumption")
+    tt_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    tt_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    tt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    eg_p = subparsers.add_parser("event-graph", help="Build and analyze event dependency graphs")
+    eg_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    eg_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    eg_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2536,6 +2548,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Goal drift analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "token-trace":
+        events = _load_tt_events(args.evidence_dir)
+        report = analyze_token_trace(events)
+        if args.format == "json":
+            output = format_tt_json(report)
+        else:
+            output = format_tt_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Token trace written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "event-graph":
+        events = _load_eg_events(args.evidence_dir)
+        report = analyze_event_graph(events)
+        if args.format == "json":
+            output = format_eg_json(report)
+        else:
+            output = format_eg_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Event graph written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
