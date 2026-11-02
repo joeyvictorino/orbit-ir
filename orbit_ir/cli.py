@@ -178,6 +178,7 @@ from .shadow_api import analyze_shadow_apis, format_text as format_sapi_text, fo
 from .llm_jailbreak import analyze_jailbreaks, format_text as format_jb_text, format_json as format_jb_json, _load_events as _load_jb_events
 from .api_key_leak import analyze_api_key_leaks, format_text as format_akl_text, format_json as format_akl_json, _load_events as _load_akl_events
 from .container_escape import analyze_container_escapes, format_text as format_ce_text, format_json as format_ce_json, _load_events as _load_ce_events
+from .auth_bypass import analyze_auth_bypass, format_text as format_ab_text, format_json as format_ab_json, _load_events as _load_ab_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1197,6 +1198,11 @@ def build_parser() -> argparse.ArgumentParser:
     ce_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     ce_p.add_argument("--format", choices=["text", "json"], default="text")
     ce_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ab_p = subparsers.add_parser("auth-bypass", help="Detect authentication bypass patterns")
+    ab_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ab_p.add_argument("--format", choices=["text", "json"], default="text")
+    ab_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3478,6 +3484,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Container escape analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "auth-bypass":
+        events = _load_ab_events(str(args.evidence_dir))
+        report = analyze_auth_bypass(events)
+        if args.format == "json":
+            output = format_ab_json(report)
+        else:
+            output = format_ab_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Authentication bypass analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
