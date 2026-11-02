@@ -42,6 +42,7 @@ from .convert import convert_jsonl_to_csv, convert_csv_to_jsonl, convert_evidenc
 from .schema_def import validate_evidence_schema, format_schema_text, format_validation_text
 from .normalize import normalize_evidence, format_normalize_text
 from .tag import tag_events, list_tags, filter_by_tag, format_tag_text
+from .search import search_evidence as search_evidence_fn, format_search_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -278,6 +279,15 @@ def build_parser() -> argparse.ArgumentParser:
     tg.add_argument("--filter", default=None, dest="filter_tag", metavar="TAG",
                     help="Filter events to those with this tag")
     tg.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    srch = subparsers.add_parser("search", help="Search evidence for events matching criteria")
+    srch.add_argument("input", type=Path, help="Evidence JSONL file")
+    srch.add_argument("--query", "-q", help="Full-text regex search across event fields")
+    srch.add_argument("--agent", help="Filter by agent name")
+    srch.add_argument("--action", help="Filter by action type")
+    srch.add_argument("--after", help="Events after this ISO timestamp")
+    srch.add_argument("--before", help="Events before this ISO timestamp")
+    srch.add_argument("--format", choices=["json", "text"], default="text", dest="output_format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -551,6 +561,20 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_tag_text(result), end="")
+        return
+    elif args.command == "search":
+        results = search_evidence_fn(
+            args.input,
+            query=args.query,
+            agent=args.agent,
+            action=args.action,
+            after=args.after,
+            before=getattr(args, "before", None),
+        )
+        if args.output_format == "json":
+            print(json.dumps(results, sort_keys=True, indent=2, default=str))
+        else:
+            print(format_search_text(results), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
