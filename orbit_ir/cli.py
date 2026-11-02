@@ -20,6 +20,7 @@ from .generator import LabConfig, generate_dataset
 from .schema import schema_json
 from .validate import validate_evidence
 from .merge import merge_evidence
+from .fingerprint import fingerprint_agents, format_fingerprint_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -119,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--inputs", type=Path, nargs="+", required=True, help="Evidence directories to merge")
     merge.add_argument("--out", type=Path, required=True, help="Output directory for merged evidence")
 
+    fp = subparsers.add_parser("fingerprint", help="Compute agent behavior fingerprints and anomaly scores")
+    fp.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    fp.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -190,6 +195,13 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "merge":
         result = merge_evidence(args.inputs, args.out)
         print(json.dumps(result, sort_keys=True, indent=2))
+        return
+    elif args.command == "fingerprint":
+        result = fingerprint_agents(args.input)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_fingerprint_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
