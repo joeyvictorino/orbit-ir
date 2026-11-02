@@ -117,6 +117,8 @@ from .sandbox_escape import analyze_sandbox_escape, format_text as format_escape
 from .supply_chain import analyze_supply_chain, format_text as format_sc_text, format_json as format_sc_json, _load_events as _load_sc_events
 from .api_abuse import analyze_api_abuse, format_text as format_apiabuse_text, format_json as format_apiabuse_json, _load_events as _load_apiabuse_events
 from .memory_forensics import analyze_memory_forensics, format_text as format_memfor_text, format_json as format_memfor_json, _load_events as _load_memfor_events
+from .command_inject import analyze_command_inject, format_text as format_cmdinject_text, format_json as format_cmdinject_json, _load_events as _load_cmdinject_events
+from .file_access import analyze_file_access, format_text as format_fileaccess_text, format_json as format_fileaccess_json, _load_events as _load_fileaccess_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -808,6 +810,16 @@ def build_parser() -> argparse.ArgumentParser:
     memfor_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     memfor_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     memfor_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cmdinject_p = subparsers.add_parser("command-inject", help="Detect command injection patterns in agent tool calls")
+    cmdinject_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cmdinject_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cmdinject_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    fileaccess_p = subparsers.add_parser("file-access", help="Detect unauthorized file access patterns")
+    fileaccess_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    fileaccess_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    fileaccess_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2231,6 +2243,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Memory forensics report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "command-inject":
+        evidence_events = _load_cmdinject_events(args.evidence_dir)
+        report = analyze_command_inject(evidence_events)
+        if args.format == "json":
+            output = format_cmdinject_json(report)
+        else:
+            output = format_cmdinject_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Command injection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "file-access":
+        evidence_events = _load_fileaccess_events(args.evidence_dir)
+        report = analyze_file_access(evidence_events)
+        if args.format == "json":
+            output = format_fileaccess_json(report)
+        else:
+            output = format_fileaccess_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"File access report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
