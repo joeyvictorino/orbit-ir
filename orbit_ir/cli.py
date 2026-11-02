@@ -91,6 +91,8 @@ from .counterfactual import analyze_counterfactual, format_counterfactual_text
 from .privesc import analyze_privilege_escalation, format_text as format_privesc_text, format_json as format_privesc_json
 from .data_flow import analyze_data_flow, format_data_flow_text
 from .compliance_check import check_compliance, format_compliance_text, list_frameworks
+from .session_replay import replay_sessions, format_replay_text as format_session_replay_text, format_replay_json as format_session_replay_json
+from .intent import classify_intents, format_intent_text, format_intent_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -637,6 +639,19 @@ def build_parser() -> argparse.ArgumentParser:
     cc.add_argument("--rules", type=Path, default=None, help="Custom rules YAML/JSON file")
     cc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     cc.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sr = subparsers.add_parser("session-replay", help="Reconstruct agent sessions from evidence into readable transcripts")
+    sr.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    sr.add_argument("--agent", default=None, help="Filter to specific agent ID")
+    sr.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    sr.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    intent = subparsers.add_parser("intent", help="Classify agent intent from action sequences")
+    intent.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    intent.add_argument("--agent", default=None, help="Filter to specific agent ID")
+    intent.add_argument("--min-confidence", type=float, default=0.5, help="Minimum signal confidence (default: 0.5)")
+    intent.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    intent.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1676,6 +1691,35 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Kill chain analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "session-replay":
+        report = replay_sessions(args.evidence_dir, agent_id=args.agent)
+        if args.format == "json":
+            output = format_session_replay_json(report)
+        else:
+            output = format_session_replay_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Session replay written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "intent":
+        report = classify_intents(
+            args.evidence_dir, agent_id=args.agent,
+            min_confidence=args.min_confidence,
+        )
+        if args.format == "json":
+            output = format_intent_json(report)
+        else:
+            output = format_intent_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Intent classification written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
