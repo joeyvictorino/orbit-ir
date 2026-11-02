@@ -93,6 +93,8 @@ from .data_flow import analyze_data_flow, format_data_flow_text
 from .compliance_check import check_compliance, format_compliance_text, list_frameworks
 from .session_replay import replay_sessions, format_replay_text as format_session_replay_text, format_replay_json as format_session_replay_json
 from .intent import classify_intents, format_intent_text, format_intent_json
+from .dwell_time import analyze as analyze_dwell_time, format_text as format_dwell_text, format_json as format_dwell_json
+from .access_pattern import analyze as analyze_access_pattern, format_text as format_access_text, format_json as format_access_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -652,6 +654,21 @@ def build_parser() -> argparse.ArgumentParser:
     intent.add_argument("--min-confidence", type=float, default=0.5, help="Minimum signal confidence (default: 0.5)")
     intent.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     intent.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dw = subparsers.add_parser("dwell-time", help="Measure incident dwell time with phase breakdown and benchmarks")
+    dw.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    dw.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    dw.add_argument("--benchmark-detect-days", type=float, default=None, help="Benchmark days for time to detect")
+    dw.add_argument("--benchmark-respond-days", type=float, default=None, help="Benchmark days for time to respond")
+    dw.add_argument("--benchmark-total-days", type=float, default=None, help="Benchmark days for total duration")
+    dw.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ap = subparsers.add_parser("access-pattern", help="Detect access pattern anomalies in agent behavior")
+    ap.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ap.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ap.add_argument("--baseline-start", type=int, default=6, help="Baseline hours start (default: 6)")
+    ap.add_argument("--baseline-end", type=int, default=22, help="Baseline hours end (default: 22)")
+    ap.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1720,6 +1737,44 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Intent classification written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "dwell-time":
+        benchmarks = None
+        if any(v is not None for v in [args.benchmark_detect_days, args.benchmark_respond_days, args.benchmark_total_days]):
+            benchmarks = {}
+            if args.benchmark_detect_days is not None:
+                benchmarks["time_to_detect_days"] = args.benchmark_detect_days
+            if args.benchmark_respond_days is not None:
+                benchmarks["time_to_respond_days"] = args.benchmark_respond_days
+            if args.benchmark_total_days is not None:
+                benchmarks["total_duration_days"] = args.benchmark_total_days
+        report = analyze_dwell_time(args.evidence_dir, benchmarks=benchmarks)
+        if args.format == "json":
+            output = format_dwell_json(report)
+        else:
+            output = format_dwell_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Dwell time analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "access-pattern":
+        report = analyze_access_pattern(
+            args.evidence_dir,
+            baseline_hours=(args.baseline_start, args.baseline_end),
+        )
+        if args.format == "json":
+            output = format_access_json(report)
+        else:
+            output = format_access_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Access pattern analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
