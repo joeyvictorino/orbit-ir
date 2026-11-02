@@ -95,6 +95,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Export agent communication graph as DOT to comm_graph.dot in the output directory",
     )
+    analyze.add_argument(
+        "--heatmap",
+        action="store_true",
+        default=False,
+        help="Export agent activity heatmap as JSON to heatmap.json in the output directory",
+    )
+    analyze.add_argument(
+        "--heatmap-bucket",
+        type=int,
+        default=60,
+        help="Bucket size in minutes for heatmap (default: 60)",
+    )
 
     verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
     verify.add_argument("--input", type=Path, required=True, help="Evidence directory to verify")
@@ -274,6 +286,13 @@ def _run(args: argparse.Namespace) -> None:
                 encoding="utf-8",
             )
             print(dot_text, end="")
+        elif args.heatmap:
+            heatmap = load_and_build_heatmap(args.input, args.heatmap_bucket)
+            heatmap_summary = format_heatmap_summary(heatmap)
+            heatmap_path = args.out / "heatmap.json"
+            heatmap_text = json.dumps(heatmap_summary, indent=2, sort_keys=True) + "\n"
+            heatmap_path.write_text(heatmap_text, encoding="utf-8")
+            print(heatmap_text, end="")
         elif args.evidence_chain:
             chain_path = args.out / "evidence_chain.json"
             print(chain_path.read_text(encoding="utf-8"), end="")
