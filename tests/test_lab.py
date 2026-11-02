@@ -536,5 +536,43 @@ class LabTest(unittest.TestCase):
                     self.assertLessEqual(score, 1.0)
 
 
+    def test_lateral_movement_detected_with_resource_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            truth = generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(
+                evidence_dir, results_dir,
+                ground_truth_path=evidence_dir / "ground_truth.json",
+            )
+
+            self.assertEqual(len(truth["lateral_access_tool_call_ids"]), 4)
+            self.assertIn("lateral_movement_detections", summary["findings"])
+            self.assertEqual(summary["findings"]["lateral_movement_detections"], 4)
+
+            lm_file = results_dir / "lateral_movement.json"
+            self.assertTrue(lm_file.exists())
+            detections = json.loads(lm_file.read_text())
+            self.assertEqual(len(detections), 4)
+            for d in detections:
+                self.assertIn("tool_call_id", d)
+                self.assertIn("resource_owner", d)
+                self.assertNotEqual(d["agent_id"], d["resource_owner"])
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Lateral movement", report)
+            self.assertIn("lateral_movement.json", report)
+
+            eval_result = summary["evaluation"]["lateral_movement_detection"]
+            self.assertEqual(eval_result["false_positive"], 0)
+            self.assertEqual(eval_result["false_negative"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

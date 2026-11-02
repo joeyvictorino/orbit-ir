@@ -20,6 +20,7 @@ MITRE_TECHNIQUES: dict[str, dict[str, str]] = {
     "trace-id-mismatch": {"id": "T1070", "name": "Indicator Removal"},
     "missing-transcript": {"id": "T1070", "name": "Indicator Removal"},
     "missing-control-plane-event": {"id": "T1070", "name": "Indicator Removal"},
+    "lateral-resource-access": {"id": "T1021", "name": "Remote Services"},
 }
 SOURCE_FIELDS = {
     "messages.jsonl": {
@@ -393,8 +394,6 @@ def analyze_dataset(
                 "detail": "; ".join(detail_parts) if detail_parts else ";".join(reasons),
             })
 
-    timeline_events.sort(key=lambda e: (e["timestamp"], e["agent_id"]))
-
     credential_agents: dict[str, set[str]] = defaultdict(set)
     credential_lines: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for tool_call_id, controls in controls_by_call.items():
@@ -409,6 +408,20 @@ def analyze_dataset(
     )
 
     agent_clusters = _detect_agent_clusters(credential_agents, board_edges, all_agents)
+
+    lateral_movement = _detect_lateral_movement(controls_by_call)
+    detected_lateral_ids = {f["tool_call_id"] for f in lateral_movement}
+    for lm in lateral_movement:
+        timeline_events.append({
+            "timestamp": lm["timestamp"],
+            "agent_id": lm["agent_id"],
+            "source": "control_plane.jsonl",
+            "line": lm["source_line"],
+            "event_type": "lateral-movement",
+            "detail": f"accessed {lm['resource']} (assigned to {lm['resource_owner']})",
+        })
+
+    timeline_events.sort(key=lambda e: (e["timestamp"], e["agent_id"]))
 
     coordinator_ranking = [
         {"agent_id": agent, "assignment_count": count}
@@ -475,6 +488,7 @@ def analyze_dataset(
             "trajectory_records": len(trajectories),
             "shared_credentials": len(shared_credentials),
             "agent_clusters": len(agent_clusters),
+            "lateral_movement_detections": len(lateral_movement),
             "reason_counts": dict(sorted(reason_counts.items())),
             "confidence_bands": {"high": confidence_bands.get("high", 0), "medium": confidence_bands.get("medium", 0), "low": confidence_bands.get("low", 0)},
             "average_confidence_score": avg_confidence,
@@ -513,6 +527,7 @@ def analyze_dataset(
             "unbacked_completion_detection": _prf(detected_unbacked, set(truth.get("unbacked_completion_tool_call_ids", []))),
             "oracle_modification_detection": _prf(detected_oracle, set(truth.get("oracle_modification_tool_call_ids", []))),
             "credential_reuse_detection": _prf(set(shared_credentials), set(truth.get("shared_credential_ids", []))),
+            "lateral_movement_detection": _prf(detected_lateral_ids, set(truth.get("lateral_access_tool_call_ids", []))),
             "interpretation": "The evaluation fixture was consulted only after detections were complete. Scores measure recovery on generated data, not expected production accuracy.",
         }
 
@@ -571,6 +586,10 @@ def analyze_dataset(
         json.dumps(agent_clusters, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "lateral_movement.json").write_text(
+        json.dumps(lateral_movement, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "timeline.json").write_text(
         json.dumps(timeline_events, indent=2, sort_keys=True) + "\n", encoding="utf-8",
     )
@@ -592,7 +611,7 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters)
+    report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters, lateral_movement)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
 
@@ -707,6 +726,62 @@ def _detect_agent_clusters(
             "size": len(members),
         })
     return clusters
+
+
+def _detect_lateral_movement(
+    controls_by_call: dict[str, list[tuple[int, dict]]],
+) -> list[dict]:
+    """Detect agents accessing resources assigned to different agents.
+
+    A control-plane event with a ``resource_owner`` field that differs from
+    the acting ``agent_id`` is a lateral resource access.
+    """
+    findings: list[dict] = []
+    for tool_call_id, controls in sorted(controls_by_call.items()):
+        for line_number, row in controls:
+            owner = row.get("resource_owner")
+            if owner is None:
+                continue
+            if row["agent_id"] == owner:
+                continue
+            findings.append({
+                "tool_call_id": tool_call_id,
+                "agent_id": row["agent_id"],
+                "resource": row.get("resource", "unknown"),
+                "resource_owner": owner,
+                "timestamp": row["timestamp"],
+                "effect": row.get("effect", "unknown"),
+                "source_line": line_number,
+                "severity": "high",
+            })
+    return findings
+
+
+def _render_lateral_movement(lateral_findings: list[dict]) -> str:
+    if not lateral_findings:
+        return ""
+    lines = ["## Lateral movement", ""]
+    lines.append(
+        f"{len(lateral_findings):,} instance(s) of an agent accessing a resource "
+        "assigned to a different agent."
+    )
+    lines.append("")
+    lines.append("| Agent | Resource | Assigned to | Effect | Source |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for f in lateral_findings[:25]:
+        lines.append(
+            f"| {f['agent_id']} | {f['resource']} | {f['resource_owner']} "
+            f"| {f['effect']} | control_plane.jsonl:{f['source_line']} |"
+        )
+    if len(lateral_findings) > 25:
+        lines.append(f"| ... | ... | ... | ... | +{len(lateral_findings) - 25:,} more |")
+    lines.append("")
+    lines.append(
+        "Lateral resource access means an agent used a resource explicitly "
+        "assigned to another agent's workload. Full data is in `lateral_movement.json`."
+    )
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _render_clusters(clusters: list[dict]) -> str:
@@ -852,7 +927,7 @@ def _render_statistics_table(findings_summary: dict) -> str:
     return "\n".join(lines)
 
 
-def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None, clusters: list[dict] | None = None) -> str:
+def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None, clusters: list[dict] | None = None, lateral_movement: list[dict] | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
     files = "\n".join(
@@ -871,6 +946,7 @@ def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | 
 | Unbacked completion | {evaluation['unbacked_completion_detection']['precision']:.4f} | {evaluation['unbacked_completion_detection']['recall']:.4f} | {evaluation['unbacked_completion_detection']['true_positive']} | {evaluation['unbacked_completion_detection']['false_positive']} | {evaluation['unbacked_completion_detection']['false_negative']} |
 | Oracle integrity | {evaluation['oracle_modification_detection']['precision']:.4f} | {evaluation['oracle_modification_detection']['recall']:.4f} | {evaluation['oracle_modification_detection']['true_positive']} | {evaluation['oracle_modification_detection']['false_positive']} | {evaluation['oracle_modification_detection']['false_negative']} |
 | Credential reuse | {evaluation['credential_reuse_detection']['precision']:.4f} | {evaluation['credential_reuse_detection']['recall']:.4f} | {evaluation['credential_reuse_detection']['true_positive']} | {evaluation['credential_reuse_detection']['false_positive']} | {evaluation['credential_reuse_detection']['false_negative']} |
+| Lateral movement | {evaluation['lateral_movement_detection']['precision']:.4f} | {evaluation['lateral_movement_detection']['recall']:.4f} | {evaluation['lateral_movement_detection']['true_positive']} | {evaluation['lateral_movement_detection']['false_positive']} | {evaluation['lateral_movement_detection']['false_negative']} |
 
 The fixture is consulted only after detection. It does not determine the findings or the number of coordinators reported.
 """
@@ -901,6 +977,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 5. {findings['unbacked_completions']:,} tool calls claimed completion but their independent check failed (unbacked completions).
 6. {findings['oracle_integrity_violations']:,} tool calls modified protected test expectations (oracle integrity violations).
 7. {findings['shared_credentials']:,} workload credentials were used by more than one agent (credential reuse).
+8. {findings['lateral_movement_detections']:,} resource accesses crossed agent boundaries (lateral movement).
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
@@ -908,6 +985,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 {_render_timeline(timeline_events or [])}
 {_render_trajectory_graph(trajectories or [])}
 {_render_clusters(clusters or [])}
+{_render_lateral_movement(lateral_movement or [])}
 {_render_mitre_section(findings)}
 {_render_data_quality(data_quality or {})}
 {evaluation_section}
