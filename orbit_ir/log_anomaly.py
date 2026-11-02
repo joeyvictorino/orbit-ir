@@ -267,10 +267,10 @@ def analyze_log_anomalies(
     anomalies.extend(_detect_time_gaps(all_events))
     anomalies.extend(_detect_repetitive_patterns(all_events))
 
+    anomalies.sort(key=lambda a: {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(a.severity, 4))
+
     for i, a in enumerate(anomalies):
         a.anomaly_id = f"LA-{i + 1:03d}"
-
-    anomalies.sort(key=lambda a: {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(a.severity, 4))
 
     all_agents = sorted({a.agent_id for a in anomalies})
     type_counts: dict[str, int] = Counter(a.anomaly_type for a in anomalies)
