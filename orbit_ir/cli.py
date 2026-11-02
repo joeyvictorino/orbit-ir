@@ -28,6 +28,7 @@ from .export import export_findings
 from .fingerprint import fingerprint_agents, format_fingerprint_text
 from .scope import apply_scope
 from .summary import build_executive_summary, format_summary_text
+from .dedup import deduplicate_findings, format_dedup_summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -172,6 +173,13 @@ def build_parser() -> argparse.ArgumentParser:
     summ.add_argument("--input", type=Path, required=True, help="Results directory (contains summary.json and findings.json)")
     summ.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    dedup = subparsers.add_parser("deduplicate", help="Remove duplicate or near-duplicate findings")
+    dedup.add_argument("--input", type=Path, required=True, help="Path to findings.json")
+    dedup.add_argument("--out", type=Path, required=True, help="Output path for deduplicated findings JSON")
+    dedup.add_argument("--strategy", choices=["exact", "fuzzy"], default="exact",
+                       help="Dedup strategy: exact (same type+agent+reasons) or fuzzy (same type+agent)")
+    dedup.add_argument("--format", choices=["json", "text"], default="json", help="Output format for summary")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -279,6 +287,24 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_summary_text(result), end="")
+        return
+    elif args.command == "deduplicate":
+        all_findings = json.loads(args.input.read_text(encoding="utf-8"))
+        unique, removed = deduplicate_findings(all_findings, strategy=args.strategy)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(unique, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        summary_text = format_dedup_summary(unique, removed, args.strategy)
+        if args.format == "json":
+            print(json.dumps({
+                "total_input": len(all_findings),
+                "unique": len(unique),
+                "removed": len(removed),
+                "strategy": args.strategy,
+            }, sort_keys=True, indent=2))
+        else:
+            print(summary_text, end="")
         return
     elif args.command == "scope":
         agents_list = args.agents.split(",") if args.agents else None
