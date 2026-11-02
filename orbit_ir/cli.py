@@ -126,6 +126,7 @@ from .anomaly_score import score_anomalies, format_text as format_as_text, forma
 from .trust_boundary import analyze_trust_boundaries, format_text as format_tb_text, format_json as format_tb_json, _load_events as _load_tb_events
 from .threat_model import analyze as analyze_threat_model, format_text as format_tm_text, format_json as format_tm_json
 from .capability_map import analyze_capability_map, format_text as format_cm_text, format_json as format_cm_json, _load_events as _load_cm_events
+from .session_stats import analyze as analyze_session_stats, format_text as format_ss_text, format_json as format_ss_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -862,6 +863,11 @@ def build_parser() -> argparse.ArgumentParser:
     tm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     tm_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     tm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ss_p = subparsers.add_parser("session-stats", help="Per-session summary statistics from agent evidence")
+    ss_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ss_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ss_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2410,6 +2416,19 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Threat model report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "session-stats":
+        report = analyze_session_stats(args.evidence_dir)
+        if args.format == "json":
+            output = format_ss_json(report)
+        else:
+            output = format_ss_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Session stats written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
