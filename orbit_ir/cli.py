@@ -97,6 +97,8 @@ from .dwell_time import analyze as analyze_dwell_time, format_text as format_dwe
 from .access_pattern import analyze as analyze_access_pattern, format_text as format_access_text, format_json as format_access_json
 from .threat_intel import analyze as analyze_threat_intel, format_text as format_threat_text, format_json as format_threat_json
 from .sla import analyze as analyze_sla, format_text as format_sla_text, format_json as format_sla_json
+from .evidence_quality import analyze as analyze_evidence_quality, format_text as format_eq_text, format_json as format_eq_json
+from .response_effectiveness import analyze as analyze_response_effectiveness, format_text as format_re_text, format_json as format_re_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -685,6 +687,16 @@ def build_parser() -> argparse.ArgumentParser:
     sla_p.add_argument("--resolve-minutes", type=float, default=None, help="SLA target for time to resolve (minutes)")
     sla_p.add_argument("--notify-minutes", type=float, default=None, help="SLA target for time to notify (minutes)")
     sla_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    eq = subparsers.add_parser("evidence-quality", help="Score evidence completeness, consistency, and coverage")
+    eq.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    eq.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    eq.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    re = subparsers.add_parser("response-effectiveness", help="Measure incident response action effectiveness")
+    re.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    re.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    re.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1828,6 +1840,32 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"SLA report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "evidence-quality":
+        report = analyze_evidence_quality(args.evidence_dir)
+        if args.format == "json":
+            output = format_eq_json(report)
+        else:
+            output = format_eq_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Evidence quality report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "response-effectiveness":
+        report = analyze_response_effectiveness(args.evidence_dir)
+        if args.format == "json":
+            output = format_re_json(report)
+        else:
+            output = format_re_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Response effectiveness report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
