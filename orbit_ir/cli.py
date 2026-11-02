@@ -57,6 +57,8 @@ from .aggregate import aggregate_events, format_aggregate_text
 from .rank import rank_agents, format_rank_text
 from .window import window_analysis, format_window_text
 from .detect import detect_anomalies, format_detect_text as format_detect_output
+from .classify import classify_events, format_classify_text
+from .baseline import create_baseline, compare_baseline, format_baseline_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -400,6 +402,18 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Comma-separated patterns: burst,repeat,escalation,unusual_type")
     det.add_argument("--threshold", type=float, default=2.0, help="Detection threshold (default: 2.0)")
     det.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    cls = subparsers.add_parser("classify", help="Classify events as benign, suspicious, or malicious")
+    cls.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    cls.add_argument("--threshold", type=float, default=0.5, help="Confidence threshold for high-risk (default: 0.5)")
+    cls.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    bl = subparsers.add_parser("baseline", help="Create or compare behavioral baselines")
+    bl.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    bl.add_argument("--create", action="store_true", help="Create a new baseline profile")
+    bl.add_argument("--compare", type=Path, default=None, help="Path to baseline JSON to compare against")
+    bl.add_argument("--drift-threshold", type=float, default=0.1, help="Minimum drift to report (default: 0.1)")
+    bl.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -838,6 +852,33 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_detect_output(result), end="")
+        return
+    elif args.command == "classify":
+        result = classify_events(args.input, threshold=args.threshold)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_classify_text(result), end="")
+        return
+    elif args.command == "baseline":
+        if args.create:
+            result = create_baseline(args.input)
+            if args.format == "json":
+                print(json.dumps(result, sort_keys=True, indent=2))
+            else:
+                print(format_baseline_text(result), end="")
+        elif args.compare:
+            result = compare_baseline(
+                args.input, args.compare,
+                drift_threshold=args.drift_threshold,
+            )
+            if args.format == "json":
+                print(json.dumps(result, sort_keys=True, indent=2))
+            else:
+                print(format_baseline_text(result), end="")
+        else:
+            print("error: specify --create or --compare <baseline.json>", file=sys.stderr)
+            raise SystemExit(2)
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
