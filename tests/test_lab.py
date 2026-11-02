@@ -146,7 +146,7 @@ class LabTest(unittest.TestCase):
                 spoofed_tool_calls=0, coordinators=2,
                 unbacked_completions=4, oracle_modifications=0, seed=42,
             )
-            truth = generate_dataset(root / "evidence", config)
+            generate_dataset(root / "evidence", config)
             summary = analyze_dataset(
                 root / "evidence", root / "results",
                 ground_truth_path=root / "evidence" / "ground_truth.json",
@@ -167,7 +167,7 @@ class LabTest(unittest.TestCase):
                 spoofed_tool_calls=0, coordinators=2,
                 unbacked_completions=0, oracle_modifications=3, seed=42,
             )
-            truth = generate_dataset(root / "evidence", config)
+            generate_dataset(root / "evidence", config)
             summary = analyze_dataset(
                 root / "evidence", root / "results",
                 ground_truth_path=root / "evidence" / "ground_truth.json",
