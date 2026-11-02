@@ -120,6 +120,7 @@ from .memory_forensics import analyze_memory_forensics, format_text as format_me
 from .command_inject import analyze_command_inject, format_text as format_cmdinject_text, format_json as format_cmdinject_json, _load_events as _load_cmdinject_events
 from .file_access import analyze_file_access, format_text as format_fileaccess_text, format_json as format_fileaccess_json, _load_events as _load_fileaccess_events
 from .prompt_inject import analyze_prompt_inject, format_text as format_promptinject_text, format_json as format_promptinject_json, _load_events as _load_promptinject_events
+from .impact_chain import analyze_impact_chains, format_text as format_ic_text, format_json as format_ic_json, _load_events as _load_ic_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -826,6 +827,11 @@ def build_parser() -> argparse.ArgumentParser:
     promptinject_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     promptinject_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     promptinject_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ic_p = subparsers.add_parser("impact-chain", help="Trace cascading impact chains across agents")
+    ic_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ic_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ic_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2291,6 +2297,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Prompt injection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "impact-chain":
+        evidence_events = _load_ic_events(args.evidence_dir)
+        report = analyze_impact_chains(evidence_events)
+        if args.format == "json":
+            output = format_ic_json(report)
+        else:
+            output = format_ic_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Impact chain report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
