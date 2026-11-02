@@ -121,6 +121,8 @@ from .command_inject import analyze_command_inject, format_text as format_cmdinj
 from .file_access import analyze_file_access, format_text as format_fileaccess_text, format_json as format_fileaccess_json, _load_events as _load_fileaccess_events
 from .prompt_inject import analyze_prompt_inject, format_text as format_promptinject_text, format_json as format_promptinject_json, _load_events as _load_promptinject_events
 from .impact_chain import analyze_impact_chains, format_text as format_ic_text, format_json as format_ic_json, _load_events as _load_ic_events
+from .session_link import analyze_session_links, format_text as format_sl_text, format_json as format_sl_json, _load_events as _load_sl_events
+from .anomaly_score import score_anomalies, format_text as format_as_text, format_json as format_as_json, _load_events as _load_as_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -832,6 +834,16 @@ def build_parser() -> argparse.ArgumentParser:
     ic_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     ic_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     ic_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sl_p = subparsers.add_parser("session-link", help="Detect cross-session event links and overlaps")
+    sl_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    sl_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    sl_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    as_p = subparsers.add_parser("anomaly-score", help="Compute composite anomaly scores for agents")
+    as_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    as_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    as_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2311,6 +2323,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Impact chain report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "session-link":
+        evidence_events = _load_sl_events(args.evidence_dir)
+        report = analyze_session_links(evidence_events)
+        if args.format == "json":
+            output = format_sl_json(report)
+        else:
+            output = format_sl_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Session link report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "anomaly-score":
+        evidence_events = _load_as_events(args.evidence_dir)
+        report = score_anomalies(evidence_events)
+        if args.format == "json":
+            output = format_as_json(report)
+        else:
+            output = format_as_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Anomaly score report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
