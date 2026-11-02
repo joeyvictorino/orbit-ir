@@ -136,6 +136,7 @@ from .token_trace import analyze_token_trace, format_text as format_tt_text, for
 from .event_graph import analyze_event_graph, format_text as format_eg_text, format_json as format_eg_json, _load_events as _load_eg_events
 from .chain_of_thought import analyze_chain_of_thought, format_text as format_cot_text, format_json as format_cot_json, _load_events as _load_cot_events
 from .alert_fatigue import analyze_alert_fatigue, format_text as format_af_text, format_json as format_af_json, _load_events as _load_af_events
+from .decision_tree import analyze_decision_tree, format_text as format_dt_text, format_json as format_dt_json, _load_events as _load_dt_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -925,6 +926,11 @@ def build_parser() -> argparse.ArgumentParser:
     af_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     af_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     af_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dt_p = subparsers.add_parser("decision-tree", help="Reconstruct agent decision paths and detect anomalous decisions")
+    dt_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    dt_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    dt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2616,6 +2622,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Alert fatigue analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "decision-tree":
+        events = _load_dt_events(args.evidence_dir)
+        report = analyze_decision_tree(events)
+        if args.format == "json":
+            output = format_dt_json(report)
+        else:
+            output = format_dt_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Decision tree analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
