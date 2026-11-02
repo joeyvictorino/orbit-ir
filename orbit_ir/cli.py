@@ -103,6 +103,8 @@ from .coordination import analyze as analyze_coordination, format_text as format
 from .evidence_gaps import analyze as analyze_evidence_gaps, format_text as format_gaps_text, format_json as format_gaps_json
 from .tactic_chain import analyze_tactic_chains, format_text as format_tc_text, format_json as format_tc_json, _load_events as _load_tc_events
 from .resource_map import analyze_resource_map, format_text as format_rm_text, format_json as format_rm_json, _load_events as _load_rm_events
+from .exfil_detect import analyze_exfiltration, format_text as format_exfil_text, format_json as format_exfil_json, _load_events as _load_exfil_events
+from .c2_detect import analyze_c2, format_text as format_c2_text, format_json as format_c2_json, _load_events as _load_c2_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -724,6 +726,16 @@ def build_parser() -> argparse.ArgumentParser:
     rm_p.add_argument("--concentration-threshold", type=int, default=5, help="Min unique resources for concentration alert (default: 5)")
     rm_p.add_argument("--contention-threshold", type=int, default=2, help="Min agents for contention alert (default: 2)")
     rm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    exfil_p = subparsers.add_parser("exfil-detect", help="Detect data exfiltration patterns in agent behavior")
+    exfil_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    exfil_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    exfil_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    c2_p = subparsers.add_parser("c2-detect", help="Detect command-and-control communication patterns")
+    c2_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    c2_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    c2_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1951,6 +1963,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Resource map report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "exfil-detect":
+        evidence_events = _load_exfil_events(args.evidence_dir)
+        report = analyze_exfiltration(evidence_events)
+        if args.format == "json":
+            output = format_exfil_json(report)
+        else:
+            output = format_exfil_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Exfiltration detection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "c2-detect":
+        evidence_events = _load_c2_events(args.evidence_dir)
+        report = analyze_c2(evidence_events)
+        if args.format == "json":
+            output = format_c2_json(report)
+        else:
+            output = format_c2_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"C2 detection report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
