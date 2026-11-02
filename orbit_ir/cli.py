@@ -86,6 +86,8 @@ from .report_template import TemplateReporter, list_templates, show_template, fo
 from .attribution import load_and_attribute, format_attribution_text, summarize_attributions
 from .diff_timeline import load_and_diff, format_diff_text as format_diff_timeline_text
 from .kill_chain import load_and_analyze as load_and_analyze_kill_chain, format_kill_chain_text
+from .impact import analyze_impact, format_impact_text
+from .counterfactual import analyze_counterfactual, format_counterfactual_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -601,6 +603,19 @@ def build_parser() -> argparse.ArgumentParser:
     kc.add_argument("--path", type=Path, required=True, help="Evidence file or directory to analyze")
     kc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     kc.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    imp = subparsers.add_parser("impact", help="Per-detection impact quantification with blast radius scoring")
+    imp.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    imp.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    imp.add_argument("--min-severity", choices=["low", "medium", "high", "critical"], default="low", help="Minimum detection severity to assess")
+    imp.add_argument("--window", type=float, default=300.0, help="Time window in seconds around each detection")
+    imp.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cf = subparsers.add_parser("counterfactual", help="What-if scenario analysis for incident response")
+    cf.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cf.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cf.add_argument("--scenarios", type=Path, default=None, help="YAML/JSON file defining custom scenarios")
+    cf.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1531,6 +1546,52 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Timeline diff written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "impact":
+        from .blast_radius import _load_events as _load_ev
+        evidence_events = _load_ev(args.evidence_dir)
+        detections = [e for e in evidence_events if e.get("type") in (
+            "detection", "anomaly", "alert", "finding",
+        ) or e.get("severity") or e.get("risk_level")]
+        if not detections:
+            detections = evidence_events
+        assessments = analyze_impact(
+            detections, args.evidence_dir,
+            window_seconds=args.window, min_severity=args.min_severity,
+        )
+        if args.format == "json":
+            output = json.dumps(assessments, sort_keys=True, indent=2)
+        else:
+            output = format_impact_text(assessments)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Impact assessment written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "counterfactual":
+        from .blast_radius import _load_events as _load_ev2
+        evidence_events = _load_ev2(args.evidence_dir)
+        detections = [e for e in evidence_events if e.get("type") in (
+            "detection", "anomaly", "alert", "finding",
+        ) or e.get("severity") or e.get("risk_level")]
+        if not detections:
+            detections = evidence_events
+        results = analyze_counterfactual(
+            detections, args.evidence_dir,
+            scenario_file=args.scenarios,
+        )
+        if args.format == "json":
+            output = json.dumps(results, sort_keys=True, indent=2)
+        else:
+            output = format_counterfactual_text(results)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Counterfactual analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
