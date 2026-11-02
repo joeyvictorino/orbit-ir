@@ -55,6 +55,8 @@ from .diff_agents import diff_agents, format_diff_agents_text
 from .filter import filter_events, format_filter_text
 from .aggregate import aggregate_events, format_aggregate_text
 from .rank import rank_agents, format_rank_text
+from .window import window_analysis, format_window_text
+from .detect import detect_anomalies, format_detect_text as format_detect_output
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -383,6 +385,21 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Sort order (default: risk)")
     rnk.add_argument("--top", type=int, default=None, help="Show only top N agents")
     rnk.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    win = subparsers.add_parser("window", help="Sliding window analysis over event streams")
+    win.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    win.add_argument("--size", type=int, default=10, help="Window size in events (default: 10)")
+    win.add_argument("--step", type=int, default=None, help="Step size (default: half window)")
+    win.add_argument("--metric", choices=["count", "agents", "types", "errors"], default="count",
+                     help="Metric to compute per window")
+    win.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    det = subparsers.add_parser("detect", help="Anomaly pattern detection in event streams")
+    det.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    det.add_argument("--patterns", type=str, default=None,
+                     help="Comma-separated patterns: burst,repeat,escalation,unusual_type")
+    det.add_argument("--threshold", type=float, default=2.0, help="Detection threshold (default: 2.0)")
+    det.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -797,6 +814,30 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_rank_text(result), end="")
+        return
+    elif args.command == "window":
+        result = window_analysis(
+            args.input,
+            window_size=args.size,
+            step=args.step,
+            metric=args.metric,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_window_text(result), end="")
+        return
+    elif args.command == "detect":
+        pats = args.patterns.split(",") if args.patterns else None
+        result = detect_anomalies(
+            args.input,
+            patterns=pats,
+            threshold=args.threshold,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_detect_output(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
