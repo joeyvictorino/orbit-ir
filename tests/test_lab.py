@@ -198,6 +198,45 @@ class LabTest(unittest.TestCase):
             self.assertIn("agents", first)
             self.assertGreater(first["agent_count"], 1)
 
+    def test_mitre_techniques_mapped_to_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3,
+                unbacked_completions=5, oracle_modifications=3, seed=17,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            mitre_counts = summary["findings"]["mitre_technique_counts"]
+            self.assertIn("T1036 Masquerading", mitre_counts)
+            self.assertIn("T1565 Data Manipulation", mitre_counts)
+            self.assertEqual(mitre_counts["T1565 Data Manipulation"], 3)
+
+            with (root / "results" / "findings.csv").open(newline="", encoding="utf-8") as stream:
+                reader = csv.DictReader(stream)
+                rows = list(reader)
+            self.assertIn("mitre_techniques", reader.fieldnames)
+            spoof_row = next(r for r in rows if "tool-name-mismatch" in r["reasons"])
+            self.assertIn("T1036:Masquerading", spoof_row["mitre_techniques"])
+            oracle_row = next(r for r in rows if "oracle-integrity-violation" in r["reasons"])
+            self.assertIn("T1565:Data Manipulation", oracle_row["mitre_techniques"])
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## MITRE ATT&CK mapping", report_text)
+            self.assertIn("T1036", report_text)
+            self.assertIn("T1565", report_text)
+            self.assertIn("Masquerading", report_text)
+
+    def test_mitre_deduplication_per_finding(self) -> None:
+        from orbit_ir.analyzer import _mitre_for_reasons
+        techniques = _mitre_for_reasons(["tool-name-mismatch", "argument-digest-mismatch"])
+        ids = [t["id"] for t in techniques]
+        self.assertEqual(ids, ["T1036"])
+
     def test_malformed_json_reports_the_exact_source_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

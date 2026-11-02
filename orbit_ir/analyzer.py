@@ -10,6 +10,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 EVIDENCE_FILES = ("messages.jsonl", "transcripts.jsonl", "control_plane.jsonl")
+
+MITRE_TECHNIQUES: dict[str, dict[str, str]] = {
+    "tool-name-mismatch": {"id": "T1036", "name": "Masquerading"},
+    "argument-digest-mismatch": {"id": "T1036", "name": "Masquerading"},
+    "unbacked-completion": {"id": "T1036", "name": "Masquerading"},
+    "oracle-integrity-violation": {"id": "T1565", "name": "Data Manipulation"},
+    "agent-id-mismatch": {"id": "T1078", "name": "Valid Accounts"},
+    "trace-id-mismatch": {"id": "T1070", "name": "Indicator Removal"},
+    "missing-transcript": {"id": "T1070", "name": "Indicator Removal"},
+    "missing-control-plane-event": {"id": "T1070", "name": "Indicator Removal"},
+}
 SOURCE_FIELDS = {
     "messages.jsonl": {
         "event_id", "timestamp", "agent_id", "channel", "message_type",
@@ -118,6 +129,17 @@ def _first(records: list[tuple[int, dict]]) -> dict:
     return records[0][1] if records else {}
 
 
+def _mitre_for_reasons(reasons: list[str]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    result: list[dict[str, str]] = []
+    for reason in reasons:
+        technique = MITRE_TECHNIQUES.get(reason)
+        if technique and technique["id"] not in seen:
+            seen.add(technique["id"])
+            result.append(technique)
+    return result
+
+
 def _finding(
     finding_number: int,
     tool_call_id: str,
@@ -135,6 +157,7 @@ def _finding(
         "trace_id_transcript": transcript.get("trace_id"),
         "trace_id_control": control.get("trace_id"),
         "reasons": reasons,
+        "mitre_techniques": _mitre_for_reasons(reasons),
         "transcript_source": "transcripts.jsonl" if transcripts else None,
         "transcript_line": _source_lines(transcripts) if transcripts else None,
         "control_source": "control_plane.jsonl" if controls else None,
@@ -320,6 +343,10 @@ def analyze_dataset(
     }
 
     reason_counts = Counter(reason for item in findings for reason in item["reasons"])
+    mitre_counts: Counter[str] = Counter()
+    for item in findings:
+        for technique in item.get("mitre_techniques", []):
+            mitre_counts[f"{technique['id']} {technique['name']}"] += 1
     summary = {
         "synthetic": True,
         "scenario": "Synthetic cross-agent coordination and transcript/control-plane inconsistency exercise",
@@ -353,6 +380,7 @@ def analyze_dataset(
             "trajectory_records": len(trajectories),
             "shared_credentials": len(shared_credentials),
             "reason_counts": dict(sorted(reason_counts.items())),
+            "mitre_technique_counts": dict(sorted(mitre_counts.items())),
         },
         "method": {
             "authoritative_source": "control_plane.jsonl for executed tool activity",
@@ -414,9 +442,9 @@ def analyze_dataset(
 
     fieldnames = (
         "finding_id", "tool_call_id", "agent_id_transcript", "agent_id_control",
-        "trace_id_transcript", "trace_id_control", "reasons", "transcript_source",
-        "transcript_line", "control_source", "control_line", "claimed_tool",
-        "actual_tool", "effect", "confidence",
+        "trace_id_transcript", "trace_id_control", "reasons", "mitre_techniques",
+        "transcript_source", "transcript_line", "control_source", "control_line",
+        "claimed_tool", "actual_tool", "effect", "confidence",
     )
     with (output_dir / "findings.csv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
@@ -424,11 +452,32 @@ def analyze_dataset(
         for item in findings:
             row = dict(item)
             row["reasons"] = ";".join(row["reasons"])
+            row["mitre_techniques"] = ";".join(
+                f"{t['id']}:{t['name']}" for t in row.get("mitre_techniques", [])
+            )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
     report = _render_report(summary, evidence_manifest)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
+
+
+def _render_mitre_section(findings_summary: dict) -> str:
+    counts = findings_summary.get("mitre_technique_counts", {})
+    if not counts:
+        return ""
+    rows = []
+    for key, count in sorted(counts.items()):
+        tid, name = key.split(" ", 1)
+        rows.append(f"| {tid} | {name} | {count} |")
+    return f"""## MITRE ATT&CK mapping
+
+| Technique ID | Name | Findings |
+| --- | --- | ---: |
+{chr(10).join(rows)}
+
+Mappings are deterministic: each detection reason maps to a fixed ATT&CK technique. A finding with multiple reasons may map to multiple techniques.
+"""
 
 
 def _render_report(summary: dict, manifest: dict) -> str:
@@ -482,6 +531,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
+{_render_mitre_section(findings)}
 {evaluation_section}
 ## Evidence model
 
