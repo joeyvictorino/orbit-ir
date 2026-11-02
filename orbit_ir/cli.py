@@ -163,6 +163,8 @@ from .model_extraction import analyze as analyze_model_extraction, format_text a
 from .denial_of_service import analyze as analyze_dos, format_text as format_dos_text, format_json as format_dos_json, _load_events as _load_dos_events
 from .network_scan import analyze_network_scans, format_text as format_netscan_text, format_json as format_netscan_json, _load_events as _load_netscan_events
 from .anti_forensics import analyze_anti_forensics, format_text as format_antifor_text, format_json as format_antifor_json, _load_events as _load_antifor_events
+from .config_tamper import analyze_config_tamper, format_text as format_ct_text, format_json as format_ct_json, _load_events as _load_ct_events
+from .model_theft import analyze_model_theft, format_text as format_mt_text, format_json as format_mt_json, _load_events as _load_mt_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1107,6 +1109,16 @@ def build_parser() -> argparse.ArgumentParser:
     antifor_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     antifor_p.add_argument("--format", choices=["text", "json"], default="text")
     antifor_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ct_p = subparsers.add_parser("config-tamper", help="Detect configuration tampering patterns")
+    ct_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ct_p.add_argument("--format", choices=["text", "json"], default="text")
+    ct_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    mt_p = subparsers.add_parser("model-theft", help="Detect model theft and IP exfiltration patterns")
+    mt_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    mt_p.add_argument("--format", choices=["text", "json"], default="text")
+    mt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3182,6 +3194,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Anti-forensics analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "config-tamper":
+        events = _load_ct_events(str(args.evidence_dir))
+        report = analyze_config_tamper(events)
+        if args.format == "json":
+            output = format_ct_json(report)
+        else:
+            output = format_ct_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Config tamper analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "model-theft":
+        events = _load_mt_events(str(args.evidence_dir))
+        report = analyze_model_theft(events)
+        if args.format == "json":
+            output = format_mt_json(report)
+        else:
+            output = format_mt_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Model theft analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
