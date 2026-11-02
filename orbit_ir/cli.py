@@ -113,6 +113,8 @@ from .tool_abuse import analyze_tool_abuse, format_text as format_abuse_text, fo
 from .data_staging import analyze_staging, format_text as format_staging_text, format_json as format_staging_json, _load_events as _load_staging_events
 from .privilege_abuse import analyze_privilege_abuse, format_text as format_privabuse_text, format_json as format_privabuse_json, _load_events as _load_privabuse_events
 from .tool_misuse import analyze_tool_misuse, format_text as format_toolmisuse_text, format_json as format_toolmisuse_json, _load_events as _load_toolmisuse_events
+from .sandbox_escape import analyze_sandbox_escape, format_text as format_escape_text, format_json as format_escape_json, _load_events as _load_escape_events
+from .supply_chain import analyze_supply_chain, format_text as format_sc_text, format_json as format_sc_json, _load_events as _load_sc_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -784,6 +786,16 @@ def build_parser() -> argparse.ArgumentParser:
     toolmisuse_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     toolmisuse_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     toolmisuse_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    escape_p = subparsers.add_parser("sandbox-escape", help="Detect sandbox and container escape attempts")
+    escape_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    escape_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    escape_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sc_p = subparsers.add_parser("supply-chain", help="Detect supply chain attack patterns")
+    sc_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    sc_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    sc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2151,6 +2163,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Tool misuse report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "sandbox-escape":
+        evidence_events = _load_escape_events(args.evidence_dir)
+        report = analyze_sandbox_escape(evidence_events)
+        if args.format == "json":
+            output = format_escape_json(report)
+        else:
+            output = format_escape_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Sandbox escape report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "supply-chain":
+        evidence_events = _load_sc_events(args.evidence_dir)
+        report = analyze_supply_chain(evidence_events)
+        if args.format == "json":
+            output = format_sc_json(report)
+        else:
+            output = format_sc_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Supply chain report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
