@@ -1036,6 +1036,17 @@ def build_parser() -> argparse.ArgumentParser:
     collusion_p.add_argument("--sync-window", type=float, default=5.0, help="Time window for synchronized action detection")
     collusion_p.add_argument("--escalation-window", type=float, default=120.0, help="Time window for coordinated escalation detection")
 
+    ereplay_p = subparsers.add_parser("evidence-replay", help="Replay evidence events chronologically and score fidelity")
+    ereplay_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ereplay_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ereplay_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    acorr_p = subparsers.add_parser("anomaly-correlate", help="Cross-detector anomaly correlation analysis")
+    acorr_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    acorr_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    acorr_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    acorr_p.add_argument("--window", type=float, default=300.0, help="Time window in seconds for correlation (default: 300)")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -2942,6 +2953,32 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Resource abuse analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "evidence-replay":
+        report = analyze_evidence_replay(args.evidence_dir)
+        if args.format == "json":
+            output = format_ereplay_json(report)
+        else:
+            output = format_ereplay_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Evidence replay analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "anomaly-correlate":
+        report = analyze_anomaly_correlate(args.evidence_dir, window_seconds=args.window)
+        if args.format == "json":
+            output = format_acorr_json(report)
+        else:
+            output = format_acorr_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Anomaly correlation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
