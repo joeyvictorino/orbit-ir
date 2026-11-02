@@ -63,6 +63,8 @@ from .correlate_agents import correlate_agents_analysis, format_correlate_agents
 from .sentiment import analyze_sentiment, format_sentiment_text
 from .profile_agents import profile_agents, format_profile_text
 from .benchmark import run_benchmark, format_benchmark_text
+from .topology import load_and_build as load_topology, format_topology_text, format_topology_dot
+from .timeline_compare import load_and_compare, format_compare_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -436,6 +438,17 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--input", type=Path, required=True, help="Evidence directory")
     bench.add_argument("--iterations", type=int, default=5, help="Number of iterations (default: 5)")
     bench.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    topo = subparsers.add_parser("topology", help="Map agent communication topology with centrality analysis")
+    topo.add_argument("--input", type=Path, required=True, help="Evidence directory or messages.jsonl")
+    topo.add_argument("--out", type=Path, default=None, help="Output file (default: stdout)")
+    topo.add_argument("--format", choices=["text", "json", "dot"], default="text", help="Output format")
+
+    tc = subparsers.add_parser("timeline-compare", help="Diff two timeline exports")
+    tc.add_argument("--a", type=Path, required=True, help="First timeline JSONL")
+    tc.add_argument("--b", type=Path, required=True, help="Second timeline JSONL")
+    tc.add_argument("--out", type=Path, default=None, help="Output file (default: stdout)")
+    tc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -911,6 +924,32 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_benchmark_text(result), end="")
+        return
+    elif args.command == "topology":
+        topo = load_topology(args.input)
+        if args.format == "json":
+            output = json.dumps(topo, indent=2, sort_keys=True)
+        elif args.format == "dot":
+            output = format_topology_dot(topo)
+        else:
+            output = format_topology_text(topo)
+        if args.out:
+            args.out.write_text(output, encoding="utf-8")
+            print(f"Topology written to {args.out}")
+        else:
+            print(output, end="")
+        return
+    elif args.command == "timeline-compare":
+        result = load_and_compare(args.a, args.b)
+        if args.format == "json":
+            output = json.dumps(result, indent=2, sort_keys=True)
+        else:
+            output = format_compare_text(result)
+        if args.out:
+            args.out.write_text(output, encoding="utf-8")
+            print(f"Comparison written to {args.out}")
+        else:
+            print(output, end="")
         return
     elif args.command == "baseline":
         if args.create:
