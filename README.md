@@ -45,7 +45,7 @@ python3 -m orbit_ir.cli schema
 
 The schema is also available at [`docs/analysis-schema.json`](docs/analysis-schema.json). Use it to validate output or generate types in other languages.
 
-Optionally, `pip install .` adds an `orbit-ir` command with the same subcommands (`generate`, `analyze`, `demo`, `schema`, `verify`, `validate`, `diff`).
+Optionally, `pip install .` adds an `orbit-ir` command with the same subcommands.
 
 ## Reading
 
@@ -55,6 +55,71 @@ Optionally, `pip install .` adds an `orbit-ir` command with the same subcommands
 ## Investigation question
 
 Can independent telemetry establish which agents coordinated outside their assigned channel, which transcript records conflict with actual tool execution, and what identities, credentials, resources, effects, and control decisions were involved?
+
+## Commands
+
+All commands are available as `python3 -m orbit_ir.cli <command>` or (after `pip install .`) as `orbit-ir <command>`.
+
+### Core analysis
+
+| Command | Description |
+| --- | --- |
+| `demo` | Generate and analyze a full deterministic exercise in one step |
+| `generate` | Generate deterministic synthetic evidence with configurable parameters |
+| `analyze` | Analyze evidence and write source-linked findings, trajectories, and reports |
+| `schema` | Print the JSON Schema for the analysis summary output |
+
+### Evidence inspection
+
+| Command | Description |
+| --- | --- |
+| `stats` | Print summary statistics for an evidence dataset (record counts, time window, agent count) |
+| `timeline` | Merge evidence into a single chronological event stream with optional agent/source filters |
+| `validate` | Validate evidence format and cross-file integrity (schema, timestamps, referential consistency) |
+| `verify` | Verify evidence integrity against a SHA-256 manifest |
+| `scope` | Filter evidence by time window, agent set, or source before analysis |
+| `merge` | Merge multiple evidence directories into one |
+
+### Post-analysis
+
+| Command | Description |
+| --- | --- |
+| `diff` | Compare two analysis results directories (added/removed/changed findings) |
+| `fingerprint` | Compute agent behavior fingerprints and anomaly scores |
+| `correlate` | Cross-link events across evidence sources by agent and time window |
+| `export` | Convert findings to CSV, CEF, SARIF, or JSON without re-analyzing |
+| `summary` | Generate an executive summary from analysis results |
+
+### Analyze flags
+
+The `analyze` command accepts several output and filtering flags:
+
+```bash
+orbit-ir analyze --input evidence/ --out results/ \
+  --ground-truth evidence/ground_truth.json \
+  --format sarif \
+  --min-confidence high \
+  --min-severity medium \
+  --detection-type tool-name-mismatch,unbacked-completion \
+  --agent agent_0001,agent_0002 \
+  --comm-graph \
+  --heatmap --heatmap-bucket 30 \
+  --navigator-layer \
+  --evidence-chain
+```
+
+| Flag | Values | Description |
+| --- | --- | --- |
+| `--format` | `json`, `sarif`, `html`, `csv`, `cef` | Output format (default: `json`). SARIF for GitHub Code Scanning, CEF for SIEM ingestion, HTML for browser-readable report |
+| `--min-confidence` | `low`, `medium`, `high` | Only include findings at or above this confidence level |
+| `--min-severity` | `low`, `medium`, `high`, `critical` | Only include findings at or above this severity level |
+| `--detection-type` | comma-separated | Filter to specific detection types (e.g. `tool-name-mismatch`, `unbacked-completion`, `oracle-integrity`) |
+| `--agent` | comma-separated | Filter findings to specific agent IDs |
+| `--comm-graph` | flag | Export agent communication graph as DOT to `comm_graph.dot` |
+| `--heatmap` | flag | Export agent activity heatmap as JSON to `heatmap.json` |
+| `--heatmap-bucket` | minutes | Bucket size for heatmap (default: 60) |
+| `--navigator-layer` | flag | Export findings as a MITRE ATT&CK Navigator layer |
+| `--evidence-chain` | flag | Print the cryptographic evidence chain (hash-linked findings to evidence) |
 
 ## Architecture
 
@@ -77,8 +142,23 @@ flowchart TD
 | --- | --- |
 | `orbit_ir/generator.py` | Seeded, deterministic synthetic evidence plus an answer key |
 | `orbit_ir/analyzer.py` | Schema and timestamp validation, joins, integrity checks, findings, report rendering |
-| `orbit_ir/schema.py` | JSON Schema for the analysis summary output (`orbit-ir schema`) |
-| `orbit_ir/cli.py` | `generate`, `analyze`, `demo`, `schema`, `verify`, `validate`, `diff` subcommands and error reporting |
+| `orbit_ir/schema.py` | JSON Schema for the analysis summary output |
+| `orbit_ir/cli.py` | CLI dispatcher: 15 subcommands and error reporting |
+| `orbit_ir/stats.py` | Evidence dataset summary statistics (record counts, time windows, agent sets) |
+| `orbit_ir/diff.py` | Structural diff between two analysis result sets |
+| `orbit_ir/validate.py` | Evidence format and cross-file integrity validation |
+| `orbit_ir/merge.py` | Evidence directory merging with deduplication |
+| `orbit_ir/timeline.py` | Chronological event stream across all evidence sources |
+| `orbit_ir/comm_graph.py` | Agent communication graph construction and DOT export |
+| `orbit_ir/heatmap.py` | Agent activity heatmap with configurable time buckets |
+| `orbit_ir/fingerprint.py` | Agent behavior fingerprinting and anomaly scoring |
+| `orbit_ir/correlate.py` | Cross-source event correlation by agent and time window |
+| `orbit_ir/cef.py` | Common Event Format (CEF) export for SIEM ingestion |
+| `orbit_ir/sarif.py` | SARIF 2.1.0 output for GitHub Code Scanning |
+| `orbit_ir/html_report.py` | HTML report rendering |
+| `orbit_ir/export.py` | Standalone format conversion (CSV, CEF, SARIF, JSON) without re-analysis |
+| `orbit_ir/scope.py` | Evidence scope filtering by time window, agent set, or source |
+| `orbit_ir/summary.py` | Executive summary generation from analysis results |
 
 Ground truth is not required for analysis. When supplied, it is consulted only after detections are complete and adds an evaluation section without changing any finding.
 
@@ -114,6 +194,12 @@ The committed `artifacts/full_scale/` outputs were generated from this fixture. 
 - Emits source file and line references in findings and trajectories.
 - Normalizes the investigation window to UTC.
 - Keeps factual extraction, joins, integrity checks, and findings deterministic.
+- Maps findings to MITRE ATT&CK techniques with Navigator layer export.
+- Computes agent behavior fingerprints and anomaly scores.
+- Correlates events across evidence sources by agent and time window.
+- Builds agent communication graphs and activity heatmaps.
+- Exports findings as CEF for SIEM ingestion (Splunk, ArcSight, ELK).
+- Cryptographic evidence chain links findings to evidence via SHA-256 hashes.
 
 Evidence path followed by each trajectory:
 
@@ -127,21 +213,29 @@ workload identity -> agent -> tool call -> credential -> resource -> effect -> c
 | --- | --- |
 | `summary.json` | Corpus, findings, method, limitations, and optional evaluation |
 | `findings.csv` | Record conflicts with exact source files and lines |
+| `findings.json` | Machine-readable findings with full metadata |
+| `findings.sarif` | SARIF 2.1.0 for GitHub Code Scanning integration |
+| `findings.cef` | CEF for SIEM ingestion (Splunk, ArcSight, ELK) |
 | `trajectories.json` | Identity-to-effect paths with supporting source references |
 | `coordinator_ranking.json` | Assignment-volume ranking using an explicit threshold (`--coordinator-min-assignments`, default 2) |
 | `credential_reuse.json` | Workload credentials shared across multiple agents |
 | `data_quality.json` | Duplicate message identifiers and integrity observations |
 | `evidence_manifest.json` | SHA-256 evidence inventory and role labels |
+| `evidence_chain.json` | Cryptographic hash chain linking findings to evidence |
 | `report.md` | Concise decision-grade findings and caveats |
+| `report.html` | Browser-readable HTML report with the same content |
+| `comm_graph.dot` | Agent communication graph in DOT format (with `--comm-graph`) |
+| `heatmap.json` | Agent activity heatmap (with `--heatmap`) |
+| `navigator_layer.json` | MITRE ATT&CK Navigator layer (with `--navigator-layer`) |
 
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v    # 13 tests
-pip install ruff==0.17.0 && ruff check .    # lint, rules in pyproject.toml
+python3 -m pytest tests/ -v              # 233 tests
+pip install ruff==0.17.0 && ruff check . # lint, rules in pyproject.toml
 ```
 
-The tests are adversarial regressions: malformed JSON with the exact line number, missing transcripts, duplicate tool-call identifiers, identity and trace swaps, unbacked-completion detection, oracle-modification detection, credential-reuse detection, analysis without ground truth, deterministic generation, unsafe generator configuration, and CLI error reporting. CI ([`python-tests.yml`](.github/workflows/python-tests.yml)) runs them on Python 3.10 to 3.14, reruns the full exercise, diffs it against `artifacts/full_scale/`, checks that analysis works with the answer key removed, and runs the linter.
+The tests are adversarial regressions: malformed JSON with the exact line number, missing transcripts, duplicate tool-call identifiers, identity and trace swaps, unbacked-completion detection, oracle-modification detection, credential-reuse detection, analysis without ground truth, deterministic generation, unsafe generator configuration, CLI error reporting, evidence validation, evidence diffing, statistics, merging, timeline construction, behavior fingerprinting, cross-source correlation, CEF/SARIF/HTML/CSV export, scope filtering, and executive summary generation. CI ([`python-tests.yml`](.github/workflows/python-tests.yml)) runs them on Python 3.10 to 3.14, reruns the full exercise, diffs it against `artifacts/full_scale/`, checks that analysis works with the answer key removed, and runs the linter.
 
 ## What it does not do
 
