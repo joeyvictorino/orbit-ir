@@ -61,6 +61,8 @@ from .classify import classify_events, format_classify_text
 from .baseline import create_baseline, compare_baseline, format_baseline_text
 from .correlate_agents import correlate_agents_analysis, format_correlate_agents_text
 from .sentiment import analyze_sentiment, format_sentiment_text
+from .profile_agents import profile_agents, format_profile_text
+from .benchmark import run_benchmark, format_benchmark_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -425,6 +427,15 @@ def build_parser() -> argparse.ArgumentParser:
     sent = subparsers.add_parser("sentiment", help="Analyze event tone and intent markers")
     sent.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
     sent.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    prof = subparsers.add_parser("profile", help="Profile agent behavior patterns from evidence")
+    prof.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    prof.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    bench = subparsers.add_parser("benchmark", help="Benchmark analysis pipeline performance")
+    bench.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    bench.add_argument("--iterations", type=int, default=5, help="Number of iterations (default: 5)")
+    bench.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -886,6 +897,20 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_classify_text(result), end="")
+        return
+    elif args.command == "profile":
+        result = profile_agents(str(args.input))
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_profile_text(result), end="")
+        return
+    elif args.command == "benchmark":
+        result = run_benchmark(str(args.input), iterations=args.iterations)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_benchmark_text(result), end="")
         return
     elif args.command == "baseline":
         if args.create:
