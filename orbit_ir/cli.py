@@ -24,6 +24,7 @@ from .cef import findings_to_cef
 from .validate import validate_evidence
 from .merge import merge_evidence
 from .correlate import correlate_events, format_correlate_text
+from .export import export_findings
 from .fingerprint import fingerprint_agents, format_fingerprint_text
 
 
@@ -152,6 +153,11 @@ def build_parser() -> argparse.ArgumentParser:
     corr.add_argument("--time-window", type=int, default=5, help="Time window in seconds (default: 5)")
     corr.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    exp = subparsers.add_parser("export", help="Convert findings to CSV, CEF, or SARIF without re-analyzing")
+    exp.add_argument("--input", type=Path, required=True, help="Path to findings.json")
+    exp.add_argument("--format", choices=["csv", "cef", "sarif", "json"], default="csv", help="Output format")
+    exp.add_argument("--out", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -248,6 +254,10 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_correlate_text(result), end="")
+        return
+    elif args.command == "export":
+        text = export_findings(args.input, args.format, output_path=args.out)
+        print(text, end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
