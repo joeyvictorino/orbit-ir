@@ -179,6 +179,8 @@ from .llm_jailbreak import analyze_jailbreaks, format_text as format_jb_text, fo
 from .api_key_leak import analyze_api_key_leaks, format_text as format_akl_text, format_json as format_akl_json, _load_events as _load_akl_events
 from .container_escape import analyze_container_escapes, format_text as format_ce_text, format_json as format_ce_json, _load_events as _load_ce_events
 from .auth_bypass import analyze_auth_bypass, format_text as format_ab_text, format_json as format_ab_json, _load_events as _load_ab_events
+from .resource_leak import analyze_resource_leaks, format_text as format_rl_text, format_json as format_rl_json, _load_events as _load_rl_events
+from .role_impersonation import analyze_role_impersonation, format_text as format_ri_text, format_json as format_ri_json, _load_events as _load_ri_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1203,6 +1205,16 @@ def build_parser() -> argparse.ArgumentParser:
     ab_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     ab_p.add_argument("--format", choices=["text", "json"], default="text")
     ab_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rl_p = subparsers.add_parser("resource-leak", help="Detect resource leak patterns (files, connections, locks, memory)")
+    rl_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    rl_p.add_argument("--format", choices=["text", "json"], default="text")
+    rl_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ri_p = subparsers.add_parser("role-impersonation", help="Detect agent role impersonation patterns")
+    ri_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ri_p.add_argument("--format", choices=["text", "json"], default="text")
+    ri_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3498,6 +3510,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Authentication bypass analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "resource-leak":
+        events = _load_rl_events(str(args.evidence_dir))
+        report = analyze_resource_leaks(events)
+        if args.format == "json":
+            output = format_rl_json(report)
+        else:
+            output = format_rl_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Resource leak analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "role-impersonation":
+        events = _load_ri_events(str(args.evidence_dir))
+        report = analyze_role_impersonation(events)
+        if args.format == "json":
+            output = format_ri_json(report)
+        else:
+            output = format_ri_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Role impersonation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
