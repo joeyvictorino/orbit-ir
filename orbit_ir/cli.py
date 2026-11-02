@@ -63,6 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Comma-separated agent IDs to filter findings to",
     )
+    analyze.add_argument(
+        "--navigator-layer",
+        action="store_true",
+        default=False,
+        help="Export findings as a MITRE ATT&CK Navigator layer JSON file",
+    )
 
     verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
     verify.add_argument("--input", type=Path, required=True, help="Evidence directory to verify")
@@ -183,7 +189,18 @@ def _run(args: argparse.Namespace) -> None:
             (args.out / "summary.json").write_text(
                 json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-        if args.format == "sarif":
+        if args.navigator_layer:
+            findings_path = args.out / "findings.json"
+            layer_findings = json.loads(findings_path.read_text(encoding="utf-8"))
+            layer = build_navigator_layer(layer_findings)
+            layer_path = args.out / "navigator_layer.json"
+            layer_path.write_text(
+                json.dumps(layer, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+        if args.navigator_layer:
+            layer_path = args.out / "navigator_layer.json"
+            print(layer_path.read_text(encoding="utf-8"), end="")
+        elif args.format == "sarif":
             sarif_path = args.out / "findings.sarif"
             print(sarif_path.read_text(encoding="utf-8"), end="")
         elif args.format == "html":

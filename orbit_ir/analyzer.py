@@ -328,6 +328,58 @@ def filter_findings(
     return result
 
 
+SEVERITY_COLORS: dict[str, str] = {
+    "critical": "#ff0000",
+    "high": "#ff6600",
+    "medium": "#ffcc00",
+    "low": "#66cc00",
+}
+
+
+def build_navigator_layer(findings: list[dict], name: str = "orbit-ir") -> dict:
+    """Build a MITRE ATT&CK Navigator layer JSON from findings."""
+    technique_hits: dict[str, dict] = {}
+    for f in findings:
+        severity = f.get("severity", "low")
+        for reason in f.get("reasons", []):
+            tech = MITRE_TECHNIQUES.get(reason)
+            if not tech:
+                continue
+            tid = tech["id"]
+            if tid not in technique_hits:
+                technique_hits[tid] = {"count": 0, "severity": severity, "name": tech["name"]}
+            technique_hits[tid]["count"] += 1
+            if SEVERITY_ORDER.get(severity, 0) > SEVERITY_ORDER.get(technique_hits[tid]["severity"], 0):
+                technique_hits[tid]["severity"] = severity
+
+    techniques = []
+    for tid, info in sorted(technique_hits.items()):
+        techniques.append({
+            "techniqueID": tid,
+            "tactic": "",
+            "color": SEVERITY_COLORS.get(info["severity"], ""),
+            "comment": f"{info['name']}: {info['count']} finding(s), severity {info['severity']}",
+            "enabled": True,
+            "score": info["count"],
+        })
+
+    return {
+        "name": name,
+        "versions": {"attack": "14", "navigator": "4.9.1", "layer": "4.5"},
+        "domain": "enterprise-attack",
+        "description": f"ATT&CK layer from orbit-ir analysis ({len(findings)} findings)",
+        "sorting": 3,
+        "layout": {"layout": "side", "aggregateFunction": "average", "showID": True, "showName": True},
+        "hideDisabled": False,
+        "techniques": techniques,
+        "gradient": {
+            "colors": ["#66cc00", "#ffcc00", "#ff6600", "#ff0000"],
+            "minValue": 0,
+            "maxValue": max((t["score"] for t in techniques), default=1),
+        },
+    }
+
+
 def analyze_dataset(
     input_dir: Path,
     output_dir: Path,
@@ -758,6 +810,11 @@ def analyze_dataset(
         output_dir / "findings.sarif",
         lateral_movement=lateral_movement,
         input_dir=input_dir,
+    )
+
+    layer = build_navigator_layer(findings, name=output_dir.name)
+    (output_dir / "navigator_layer.json").write_text(
+        json.dumps(layer, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
     report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters, lateral_movement)
