@@ -53,6 +53,8 @@ from .redact import redact_evidence, format_redact_text
 from .batch import parse_batch_file, run_batch, format_batch_text
 from .diff_agents import diff_agents, format_diff_agents_text
 from .filter import filter_events, format_filter_text
+from .aggregate import aggregate_events, format_aggregate_text
+from .rank import rank_agents, format_rank_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -367,6 +369,20 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Filter expression: field=val, field!=val, field~regex, field>n; AND with comma, OR with pipe")
     flt.add_argument("--limit", type=int, default=None, help="Max events to return")
     flt.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    agg = subparsers.add_parser("aggregate", help="Combine evidence from multiple sources")
+    agg.add_argument("--input", type=Path, nargs="+", required=True, help="Evidence directories or JSONL files")
+    agg.add_argument("--strategy", choices=["union", "intersect", "unique"], default="union",
+                     help="Aggregation strategy (default: union)")
+    agg.add_argument("--no-dedup", action="store_true", help="Keep duplicate events in union mode")
+    agg.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    rnk = subparsers.add_parser("rank", help="Rank agents by composite risk score")
+    rnk.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    rnk.add_argument("--sort", choices=["risk", "volume", "diversity"], default="risk",
+                     help="Sort order (default: risk)")
+    rnk.add_argument("--top", type=int, default=None, help="Show only top N agents")
+    rnk.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -759,6 +775,28 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_pivot_text(result), end="")
+        return
+    elif args.command == "aggregate":
+        result = aggregate_events(
+            args.input,
+            strategy=args.strategy,
+            deduplicate=not args.no_dedup,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_aggregate_text(result), end="")
+        return
+    elif args.command == "rank":
+        result = rank_agents(
+            args.input,
+            sort_by=args.sort,
+            top_n=args.top,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_rank_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
