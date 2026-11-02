@@ -8,6 +8,7 @@ from pathlib import Path
 from .analyzer import analyze_dataset, verify_evidence
 from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
+from .schema import schema_json
 from .validate import validate_evidence
 
 
@@ -58,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--after", type=Path, required=True, help="Later results directory")
     diff.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    subparsers.add_parser("schema", help="Print the JSON Schema for the analysis summary output")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -75,6 +78,9 @@ def main() -> None:
 
 
 def _run(args: argparse.Namespace) -> None:
+    if args.command == "schema":
+        print(schema_json())
+        return
     if args.command == "generate":
         config = LabConfig(
             agents=args.agents,

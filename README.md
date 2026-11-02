@@ -37,7 +37,15 @@ python3 -m orbit_ir.cli analyze \
 
 A 40-agent miniature is in [`examples/sample_evidence/`](examples/sample_evidence/) (500 messages, 80 transcripts), with its evaluated output in `examples/sample_results/`. Malformed input exits with status 2 and a message naming the file and line, for example `error: messages.jsonl:1: invalid JSON: ...`.
 
-Optionally, `pip install .` adds an `orbit-ir` command with the same subcommands (`generate`, `analyze`, `demo`).
+Print the JSON Schema that describes the `summary.json` output:
+
+```bash
+python3 -m orbit_ir.cli schema
+```
+
+The schema is also available at [`docs/analysis-schema.json`](docs/analysis-schema.json). Use it to validate output or generate types in other languages.
+
+Optionally, `pip install .` adds an `orbit-ir` command with the same subcommands (`generate`, `analyze`, `demo`, `schema`, `verify`, `validate`, `diff`).
 
 ## Reading
 
@@ -69,7 +77,8 @@ flowchart TD
 | --- | --- |
 | `orbit_ir/generator.py` | Seeded, deterministic synthetic evidence plus an answer key |
 | `orbit_ir/analyzer.py` | Schema and timestamp validation, joins, integrity checks, findings, report rendering |
-| `orbit_ir/cli.py` | `generate`, `analyze`, `demo` subcommands and error reporting |
+| `orbit_ir/schema.py` | JSON Schema for the analysis summary output (`orbit-ir schema`) |
+| `orbit_ir/cli.py` | `generate`, `analyze`, `demo`, `schema`, `verify`, `validate`, `diff` subcommands and error reporting |
 
 Ground truth is not required for analysis. When supplied, it is consulted only after detections are complete and adds an evaluation section without changing any finding.
 

@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/joeyvictorino/orbit-ir/docs/analysis-schema.json",
+  "title": "ORBIT Analysis Summary",
+  "description": "JSON Schema for the summary.json output of orbit-ir analyze. Describes the top-level analysis result including corpus statistics, findings, evaluation metrics, methodology, limitations, and composite risk scoring.",
+  "type": "object",
+  "required": ["synthetic", "scenario", "corpus", "findings", "method", "limitations", "runtime_seconds"],
+  "additionalProperties": false,
+  "properties": {
+    "synthetic": {
+      "type": "boolean",
+      "description": "Always true for this lab; marks the data as generated."
+    },
+    "scenario": {
+      "type": "string",
+      "description": "Human-readable description of the exercise."
+    },
+    "corpus": {
+      "$ref": "#/$defs/corpus"
+    },
+    "findings": {
+      "$ref": "#/$defs/findings_summary"
+    },
+    "method": {
+      "$ref": "#/$defs/method"
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Explicit limitations of the analysis."
+    },
+    "runtime_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Wall-clock runtime in seconds (informational, hardware-dependent)."
+    },
+    "evaluation": {
+      "$ref": "#/$defs/evaluation"
+    }
+  },
+  "$defs": {
+    "corpus": {
+      "type": "object",
+      "description": "Statistics about the input evidence corpus.",
+      "required": ["agents", "messages", "transcripts", "control_plane_events"],
+      "additionalProperties": false,
+      "properties": {
+        "agents": { "type": "integer", "minimum": 0, "description": "Distinct agent IDs observed." },
+        "messages": { "type": "integer", "minimum": 0, "description": "Total message events in messages.jsonl." },
+        "transcripts": { "type": "integer", "minimum": 0, "description": "Total transcript records in transcripts.jsonl." },
+        "control_plane_events": { "type": "integer", "minimum": 0, "description": "Total records in control_plane.jsonl." },
+        "first_timestamp": { "type": ["string", "null"], "description": "Earliest UTC timestamp across all evidence (ISO 8601)." },
+        "last_timestamp": { "type": ["string", "null"], "description": "Latest UTC timestamp across all evidence (ISO 8601)." }
+      }
+    },
+    "findings_summary": {
+      "type": "object",
+      "description": "Aggregated detection results.",
+      "required": [
+        "unsanctioned_board_messages", "board_participants",
+        "transcript_tool_call_mismatches", "unbacked_completions",
+        "oracle_integrity_violations", "record_conflicts",
+        "missing_transcripts", "missing_control_plane_events",
+        "duplicate_tool_call_identifiers", "identity_or_trace_conflicts",
+        "duplicate_message_identifiers", "top_coordinators",
+        "coordinators_over_threshold", "trajectory_records",
+        "shared_credentials", "agent_clusters",
+        "lateral_movement_detections", "reason_counts",
+        "confidence_bands", "average_confidence_score",
+        "mitre_technique_counts", "timeline_events",
+        "timeline_finding_events", "timeline_assignment_events",
+        "risk_score", "risk_rating", "risk_components"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "unsanctioned_board_messages": { "type": "integer", "minimum": 0 },
+        "board_participants": { "type": "integer", "minimum": 0 },
+        "transcript_tool_call_mismatches": { "type": "integer", "minimum": 0 },
+        "unbacked_completions": { "type": "integer", "minimum": 0 },
+        "oracle_integrity_violations": { "type": "integer", "minimum": 0 },
+        "record_conflicts": { "type": "integer", "minimum": 0 },
+        "missing_transcripts": { "type": "integer", "minimum": 0 },
+        "missing_control_plane_events": { "type": "integer", "minimum": 0 },
+        "duplicate_tool_call_identifiers": { "type": "integer", "minimum": 0 },
+        "identity_or_trace_conflicts": { "type": "integer", "minimum": 0 },
+        "duplicate_message_identifiers": { "type": "integer", "minimum": 0 },
+        "top_coordinators": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Agent IDs of the top coordinators by assignment count."
+        },
+        "coordinators_over_threshold": { "type": "integer", "minimum": 0 },
+        "trajectory_records": { "type": "integer", "minimum": 0 },
+        "shared_credentials": { "type": "integer", "minimum": 0 },
+        "agent_clusters": { "type": "integer", "minimum": 0 },
+        "lateral_movement_detections": { "type": "integer", "minimum": 0 },
+        "reason_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 },
+          "description": "Count of findings by detection reason."
+        },
+        "confidence_bands": {
+          "type": "object",
+          "required": ["high", "medium", "low"],
+          "additionalProperties": false,
+          "properties": {
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "average_confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mitre_technique_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 },
+          "description": "Count of findings mapped to each MITRE ATT&CK technique."
+        },
+        "timeline_events": { "type": "integer", "minimum": 0 },
+        "timeline_finding_events": { "type": "integer", "minimum": 0 },
+        "timeline_assignment_events": { "type": "integer", "minimum": 0 },
+        "risk_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "risk_rating": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high", "critical"]
+        },
+        "risk_components": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "description": "Weighted contribution of each detection category to the composite risk score."
+        }
+      }
+    },
+    "method": {
+      "type": "object",
+      "description": "Methodology documentation.",
+      "required": ["authoritative_source", "untrusted_source", "coordinator_threshold", "evidence_controls", "llm_boundary", "ground_truth_dependency"],
+      "additionalProperties": false,
+      "properties": {
+        "authoritative_source": { "type": "string" },
+        "untrusted_source": { "type": "string" },
+        "coordinator_threshold": { "type": "string" },
+        "evidence_controls": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "llm_boundary": { "type": "string" },
+        "ground_truth_dependency": { "type": "string" }
+      }
+    },
+    "prf": {
+      "type": "object",
+      "description": "Precision / recall / F-score against a ground-truth fixture.",
+      "required": ["true_positive", "false_positive", "false_negative", "precision", "recall"],
+      "additionalProperties": false,
+      "properties": {
+        "true_positive": { "type": "integer", "minimum": 0 },
+        "false_positive": { "type": "integer", "minimum": 0 },
+        "false_negative": { "type": "integer", "minimum": 0 },
+        "precision": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "description": "Optional evaluation against a synthetic ground-truth fixture. Present only when --ground-truth is supplied.",
+      "required": [
+        "spoof_detection", "participant_detection", "coordinator_detection",
+        "unbacked_completion_detection", "oracle_modification_detection",
+        "credential_reuse_detection", "lateral_movement_detection",
+        "interpretation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "spoof_detection": { "$ref": "#/$defs/prf" },
+        "participant_detection": { "$ref": "#/$defs/prf" },
+        "coordinator_detection": { "$ref": "#/$defs/prf" },
+        "unbacked_completion_detection": { "$ref": "#/$defs/prf" },
+        "oracle_modification_detection": { "$ref": "#/$defs/prf" },
+        "credential_reuse_detection": { "$ref": "#/$defs/prf" },
+        "lateral_movement_detection": { "$ref": "#/$defs/prf" },
+        "interpretation": { "type": "string" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "description": "One record-conflict finding from findings.json.",
+      "required": ["finding_id", "tool_call_id", "reasons", "confidence", "confidence_score"],
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": { "type": "string", "pattern": "^finding-\\d{6}$" },
+        "tool_call_id": { "type": "string" },
+        "agent_id_transcript": { "type": ["string", "null"] },
+        "agent_id_control": { "type": ["string", "null"] },
+        "trace_id_transcript": { "type": ["string", "null"] },
+        "trace_id_control": { "type": ["string", "null"] },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "tool-name-mismatch", "argument-digest-mismatch",
+              "unbacked-completion", "oracle-integrity-violation",
+              "agent-id-mismatch", "trace-id-mismatch",
+              "missing-transcript", "missing-control-plane-event",
+              "duplicate-transcript-tool-call-id", "duplicate-control-tool-call-id"
+            ]
+          },
+          "minItems": 1
+        },
+        "mitre_techniques": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "transcript_source": { "type": ["string", "null"] },
+        "transcript_line": { "type": ["string", "null"] },
+        "control_source": { "type": ["string", "null"] },
+        "control_line": { "type": ["string", "null"] },
+        "claimed_tool": { "type": ["string", "null"] },
+        "actual_tool": { "type": ["string", "null"] },
+        "effect": { "type": ["string", "null"] },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "trajectory": {
+      "type": "object",
+      "description": "One reconstructed agent trajectory from trajectories.json.",
+      "required": ["finding_id", "trace_id", "path", "source_refs", "confidence", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": { "type": "string" },
+        "trace_id": { "type": "string" },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "id"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["workload_identity", "agent", "tool_call", "credential", "resource", "effect", "control_decision"]
+              },
+              "id": { "type": "string" }
+            }
+          }
+        },
+        "source_refs": {
+          "type": "object",
+          "properties": {
+            "transcript": { "type": ["string", "null"] },
+            "control_plane": { "type": "string" }
+          }
+        },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "basis": { "type": "string" }
+      }
+    }
+  }
+}
