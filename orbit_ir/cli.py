@@ -37,9 +37,9 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--coordinator-min-assignments", type=int, default=2)
     analyze.add_argument(
         "--format",
-        choices=["json", "sarif", "html"],
+        choices=["json", "sarif", "html", "csv"],
         default="json",
-        help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0, html prints the HTML report",
+        help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0, html prints the HTML report, csv prints findings CSV",
     )
     analyze.add_argument(
         "--min-confidence",
@@ -180,6 +180,9 @@ def _run(args: argparse.Namespace) -> None:
         elif args.format == "html":
             html_path = args.out / "report.html"
             print(html_path.read_text(encoding="utf-8"), end="")
+        elif args.format == "csv":
+            csv_path = args.out / "findings.csv"
+            print(csv_path.read_text(encoding="utf-8"), end="")
         else:
             print(json.dumps(summary, sort_keys=True))
     else:
