@@ -13,6 +13,7 @@ from .analyzer import (
     verify_evidence,
     verify_evidence_chain,
 )
+from .stats import evidence_stats, format_stats_text
 from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
@@ -102,6 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("schema", help="Print the JSON Schema for the analysis summary output")
 
+    stats = subparsers.add_parser("stats", help="Print summary statistics for an evidence dataset")
+    stats.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    stats.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -155,6 +160,13 @@ def _run(args: argparse.Namespace) -> None:
             _print_validation(report)
         if not report["valid"]:
             raise SystemExit(1)
+        return
+    elif args.command == "stats":
+        s = evidence_stats(args.input)
+        if args.format == "json":
+            print(json.dumps(s, sort_keys=True, indent=2))
+        else:
+            print(format_stats_text(s), end="")
         return
     elif args.command == "diff":
         result = diff_results(args.before, args.after)
