@@ -15,6 +15,7 @@ from .analyzer import (
 )
 from .stats import evidence_stats, format_stats_text
 from .diff import diff_results, format_diff_text
+from .comm_graph import load_and_build as load_comm_graph, format_dot as format_comm_dot, format_summary as format_comm_summary
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
 from .validate import validate_evidence
@@ -83,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Regenerate and print the evidence chain JSON (cryptographic hash linking findings to evidence)",
+    )
+    analyze.add_argument(
+        "--comm-graph",
+        action="store_true",
+        default=False,
+        help="Export agent communication graph as DOT to comm_graph.dot in the output directory",
     )
 
     verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
@@ -223,7 +230,18 @@ def _run(args: argparse.Namespace) -> None:
             (args.out / "summary.json").write_text(
                 json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-        if args.evidence_chain:
+        if args.comm_graph:
+            graph = load_comm_graph(args.input)
+            dot_text = format_comm_dot(graph)
+            dot_path = args.out / "comm_graph.dot"
+            dot_path.write_text(dot_text, encoding="utf-8")
+            summary_path = args.out / "comm_graph.json"
+            summary_path.write_text(
+                json.dumps(format_comm_summary(graph), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(dot_text, end="")
+        elif args.evidence_chain:
             chain_path = args.out / "evidence_chain.json"
             print(chain_path.read_text(encoding="utf-8"), end="")
         elif args.navigator_layer:
