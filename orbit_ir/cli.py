@@ -27,6 +27,7 @@ from .correlate import correlate_events, format_correlate_text
 from .export import export_findings
 from .fingerprint import fingerprint_agents, format_fingerprint_text
 from .scope import apply_scope
+from .summary import build_executive_summary, format_summary_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -167,6 +168,10 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--agents", default=None, help="Comma-separated agent IDs to include")
     sc.add_argument("--sources", default=None, help="Comma-separated sources: messages,transcripts,control_plane")
 
+    summ = subparsers.add_parser("summary", help="Generate an executive summary from analysis results")
+    summ.add_argument("--input", type=Path, required=True, help="Results directory (contains summary.json and findings.json)")
+    summ.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -267,6 +272,13 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "export":
         text = export_findings(args.input, args.format, output_path=args.out)
         print(text, end="")
+        return
+    elif args.command == "summary":
+        result = build_executive_summary(args.input)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_summary_text(result), end="")
         return
     elif args.command == "scope":
         agents_list = args.agents.split(",") if args.agents else None
