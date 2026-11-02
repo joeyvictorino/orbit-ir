@@ -38,6 +38,8 @@ from .policy import load_policy, evaluate_policy, format_policy_text
 from .simulate import generate_evidence as simulate_evidence, list_scenarios, format_simulate_text
 from .dashboard import generate_dashboard
 from .watch import watch_evidence
+from .convert import convert_jsonl_to_csv, convert_csv_to_jsonl, convert_evidence_dir, format_convert_text
+from .schema_def import validate_evidence_schema, format_schema_text, format_validation_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -242,6 +244,21 @@ def build_parser() -> argparse.ArgumentParser:
     wat.add_argument("--input", type=Path, required=True, help="Evidence directory to watch")
     wat.add_argument("--interval", type=float, default=2.0, help="Poll interval in seconds (default: 2)")
 
+    conv = subparsers.add_parser("convert", help="Convert evidence between JSONL and CSV formats")
+    conv.add_argument("--input", type=Path, required=True, help="Input file or directory")
+    conv.add_argument("--output", type=Path, required=True, help="Output file or directory")
+    conv.add_argument("--to", choices=["csv", "jsonl"], required=True, dest="target_format",
+                      help="Target format: csv or jsonl")
+
+    es = subparsers.add_parser("evidence-schema", help="Print or validate evidence file schemas")
+    es.add_argument("--print", action="store_true", default=False, dest="print_schema",
+                    help="Print the expected evidence schema")
+    es.add_argument("--validate", type=Path, default=None, metavar="DIR",
+                    help="Validate evidence files in DIR against the schema")
+    es.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+    es.add_argument("--strict", action="store_true", default=False,
+                    help="Treat unknown fields as errors instead of warnings")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -436,6 +453,31 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "watch":
         watch_evidence(args.input, interval=args.interval)
         return
+    elif args.command == "convert":
+        if args.input.is_dir():
+            result = convert_evidence_dir(args.input, args.output, args.target_format)
+        else:
+            if args.target_format == "csv":
+                result = convert_jsonl_to_csv(args.input, args.output)
+            else:
+                result = convert_csv_to_jsonl(args.input, args.output)
+        print(format_convert_text(result), end="")
+        return
+    elif args.command == "evidence-schema":
+        if args.print_schema:
+            print(format_schema_text(), end="")
+            return
+        if args.validate is not None:
+            issues = validate_evidence_schema(args.validate, strict=args.strict)
+            if args.format == "json":
+                print(json.dumps(issues, sort_keys=True, indent=2))
+            else:
+                print(format_validation_text(issues), end="")
+            if any(i["severity"] == "error" for i in issues):
+                raise SystemExit(1)
+            return
+        print("Use --print to display schemas or --validate DIR to validate evidence.", file=sys.stderr)
+        raise SystemExit(2)
     elif args.command == "analyze":
         summary = analyze_dataset(
             args.input,
