@@ -173,6 +173,9 @@ from .dns_tunnel import analyze_dns_tunneling, format_text as format_dnst_text, 
 from .session_hijack import analyze_session_hijack, format_text as format_sh_text, format_json as format_sh_json, _load_events as _load_sh_events
 from .log_forging import analyze_log_forging, format_text as format_lf_text, format_json as format_lf_json, _load_events as _load_lf_events
 from .clock_manipulation import analyze_clock_manipulation, format_text as format_clk_text, format_json as format_clk_json, _load_events as _load_clk_events
+from .env_manipulation import analyze_env_manipulation, format_text as format_em_text, format_json as format_em_json, _load_events as _load_em_events
+from .shadow_api import analyze_shadow_apis, format_text as format_sapi_text, format_json as format_sapi_json, _load_events as _load_sapi_events
+from .llm_jailbreak import analyze_jailbreaks, format_text as format_jb_text, format_json as format_jb_json, _load_events as _load_jb_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1167,6 +1170,21 @@ def build_parser() -> argparse.ArgumentParser:
     clk_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     clk_p.add_argument("--format", choices=["text", "json"], default="text")
     clk_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    em_p = subparsers.add_parser("env-manipulation", help="Detect environment variable manipulation patterns")
+    em_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    em_p.add_argument("--format", choices=["text", "json"], default="text")
+    em_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sapi_p = subparsers.add_parser("shadow-api", help="Detect shadow/undocumented API access patterns")
+    sapi_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    sapi_p.add_argument("--format", choices=["text", "json"], default="text")
+    sapi_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    jb_p = subparsers.add_parser("llm-jailbreak", help="Detect LLM jailbreak and prompt injection bypass attempts")
+    jb_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    jb_p.add_argument("--format", choices=["text", "json"], default="text")
+    jb_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3378,6 +3396,48 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Clock manipulation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "env-manipulation":
+        events = _load_em_events(str(args.evidence_dir))
+        report = analyze_env_manipulation(events)
+        if args.format == "json":
+            output = format_em_json(report)
+        else:
+            output = format_em_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Environment manipulation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "shadow-api":
+        events = _load_sapi_events(str(args.evidence_dir))
+        report = analyze_shadow_apis(events)
+        if args.format == "json":
+            output = format_sapi_json(report)
+        else:
+            output = format_sapi_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Shadow API analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "llm-jailbreak":
+        events = _load_jb_events(str(args.evidence_dir))
+        report = analyze_jailbreaks(events)
+        if args.format == "json":
+            output = format_jb_json(report)
+        else:
+            output = format_jb_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"LLM jailbreak analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
