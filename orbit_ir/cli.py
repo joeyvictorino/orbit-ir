@@ -99,6 +99,8 @@ from .threat_intel import analyze as analyze_threat_intel, format_text as format
 from .sla import analyze as analyze_sla, format_text as format_sla_text, format_json as format_sla_json
 from .evidence_quality import analyze as analyze_evidence_quality, format_text as format_eq_text, format_json as format_eq_json
 from .response_effectiveness import analyze as analyze_response_effectiveness, format_text as format_re_text, format_json as format_re_json
+from .coordination import analyze as analyze_coordination, format_text as format_coord_text, format_json as format_coord_json
+from .evidence_gaps import analyze as analyze_evidence_gaps, format_text as format_gaps_text, format_json as format_gaps_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -697,6 +699,17 @@ def build_parser() -> argparse.ArgumentParser:
     re.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     re.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     re.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    coord_p = subparsers.add_parser("coordination", help="Analyze agent coordination patterns and handoffs")
+    coord_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    coord_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    coord_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    gaps_p = subparsers.add_parser("evidence-gaps", help="Detect gaps in evidence timeline coverage")
+    gaps_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    gaps_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    gaps_p.add_argument("--threshold", type=float, default=300.0, help="Gap threshold in seconds (default: 300)")
+    gaps_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1866,6 +1879,32 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Response effectiveness report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "coordination":
+        report = analyze_coordination(args.evidence_dir)
+        if args.format == "json":
+            output = format_coord_json(report)
+        else:
+            output = format_coord_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Coordination report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "evidence-gaps":
+        report = analyze_evidence_gaps(args.evidence_dir, gap_threshold_seconds=args.threshold)
+        if args.format == "json":
+            output = format_gaps_json(report)
+        else:
+            output = format_gaps_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Evidence gaps report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
