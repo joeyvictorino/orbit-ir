@@ -36,6 +36,8 @@ from .replay import replay_events, format_replay_text
 from .enrich import enrich_evidence, format_enrich_text
 from .policy import load_policy, evaluate_policy, format_policy_text
 from .simulate import generate_evidence as simulate_evidence, list_scenarios, format_simulate_text
+from .dashboard import generate_dashboard
+from .watch import watch_evidence
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -231,6 +233,15 @@ def build_parser() -> argparse.ArgumentParser:
     sim.add_argument("--events", type=int, default=20, help="Number of events (default: 20)")
     sim.add_argument("--seed", type=int, default=42, help="Random seed for deterministic output (default: 42)")
 
+    dash = subparsers.add_parser("dashboard", help="Generate a standalone HTML dashboard from evidence")
+    dash.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    dash.add_argument("--output", type=Path, default=Path("dashboard.html"), help="Output HTML file (default: dashboard.html)")
+    dash.add_argument("--title", default="Orbit-IR Dashboard", help="Dashboard title")
+
+    wat = subparsers.add_parser("watch", help="Monitor evidence directory for changes")
+    wat.add_argument("--input", type=Path, required=True, help="Evidence directory to watch")
+    wat.add_argument("--interval", type=float, default=2.0, help="Poll interval in seconds (default: 2)")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -417,6 +428,13 @@ def _run(args: argparse.Namespace) -> None:
             num_agents=args.agents, num_events=args.events, seed=args.seed,
         )
         print(format_simulate_text(result), end="")
+        return
+    elif args.command == "dashboard":
+        result = generate_dashboard(args.input, args.output, title=args.title)
+        print(json.dumps(result, sort_keys=True, indent=2))
+        return
+    elif args.command == "watch":
+        watch_evidence(args.input, interval=args.interval)
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
