@@ -18,6 +18,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 2. Independent control-plane evidence contradicted 7 transcript tool-call records.
 5. 5 tool calls claimed completion but their independent check failed (unbacked completions).
 6. 3 tool calls modified protected test expectations (oracle integrity violations).
+7. 33 workload credentials were used by more than one agent (credential reuse).
 3. The pipeline reported 15 total record conflicts and reconstructed 15 source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
@@ -56,6 +57,6 @@ No LLM is used for extraction, joins, hashes, mismatch detection, or findings. A
 - `messages.jsonl` (evidence): `92bd18ef6cba67ea2bd095be1ff637183a5e25406b68d068efae7c3c7b7f13af` (144,800 bytes)
 - `transcripts.jsonl` (evidence): `0f84d9fd30df92fe5f8ffbef92c1f51cc57971d5f6d46987dc46abe275ac96a3` (25,849 bytes)
 - `control_plane.jsonl` (evidence): `857531bff1104f60c42c8f59fd11a91dbf369a6c9d77add0d2c94962714cc5df` (33,667 bytes)
-- `ground_truth.json` (evaluation-only): `564676b703c8cc35e369c56830267dfeda930d0fd0b8cdb71b970cccaeaa105b` (1,308 bytes)
+- `ground_truth.json` (evaluation-only): `3a396e82636cf9c1e0cbb4676ea075a806f86281fed6102e6e662e20c5e0b77e` (1,341 bytes)
 
-Runtime on the generating system: 0.006 seconds. Runtime is informational and hardware-dependent.
+Runtime on the generating system: 0.004 seconds. Runtime is informational and hardware-dependent.

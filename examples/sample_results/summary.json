@@ -61,6 +61,7 @@
       "unbacked-completion": 5
     },
     "record_conflicts": 15,
+    "shared_credentials": 33,
     "top_coordinators": [
       "agent-0009",
       "agent-0030",
@@ -92,7 +93,7 @@
     "llm_boundary": "No LLM is used for factual extraction, joins, integrity checks, or findings. An LLM may summarize already-cited findings only.",
     "untrusted_source": "transcripts.jsonl"
   },
-  "runtime_seconds": 0.006,
+  "runtime_seconds": 0.004,
   "scenario": "Synthetic cross-agent coordination and transcript/control-plane inconsistency exercise",
   "synthetic": true
 }

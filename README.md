@@ -96,6 +96,7 @@ The committed `artifacts/full_scale/` outputs were generated from this fixture. 
 - Reconciles transcript claims to independent control-plane execution records.
 - Detects unbacked completions: agent claims task done but independent check failed.
 - Detects oracle integrity violations: agent modifies protected test expectations.
+- Detects credential reuse: flags workload credentials shared across multiple agents.
 - Detects missing transcript and control-plane records.
 - Detects duplicate tool-call and message identifiers instead of silently overwriting them.
 - Detects agent-identity and trace-identity disagreement across sources.
@@ -119,6 +120,7 @@ workload identity -> agent -> tool call -> credential -> resource -> effect -> c
 | `findings.csv` | Record conflicts with exact source files and lines |
 | `trajectories.json` | Identity-to-effect paths with supporting source references |
 | `coordinator_ranking.json` | Assignment-volume ranking using an explicit threshold (`--coordinator-min-assignments`, default 2) |
+| `credential_reuse.json` | Workload credentials shared across multiple agents |
 | `data_quality.json` | Duplicate message identifiers and integrity observations |
 | `evidence_manifest.json` | SHA-256 evidence inventory and role labels |
 | `report.md` | Concise decision-grade findings and caveats |
@@ -126,11 +128,11 @@ workload identity -> agent -> tool call -> credential -> resource -> effect -> c
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v    # 12 tests
+python3 -m unittest discover -s tests -v    # 13 tests
 pip install ruff==0.17.0 && ruff check .    # lint, rules in pyproject.toml
 ```
 
-The tests are adversarial regressions: malformed JSON with the exact line number, missing transcripts, duplicate tool-call identifiers, identity and trace swaps, unbacked-completion detection, oracle-modification detection, analysis without ground truth, deterministic generation, unsafe generator configuration, and CLI error reporting. CI ([`python-tests.yml`](.github/workflows/python-tests.yml)) runs them on Python 3.10 to 3.14, reruns the full exercise, diffs it against `artifacts/full_scale/`, checks that analysis works with the answer key removed, and runs the linter.
+The tests are adversarial regressions: malformed JSON with the exact line number, missing transcripts, duplicate tool-call identifiers, identity and trace swaps, unbacked-completion detection, oracle-modification detection, credential-reuse detection, analysis without ground truth, deterministic generation, unsafe generator configuration, and CLI error reporting. CI ([`python-tests.yml`](.github/workflows/python-tests.yml)) runs them on Python 3.10 to 3.14, reruns the full exercise, diffs it against `artifacts/full_scale/`, checks that analysis works with the answer key removed, and runs the linter.
 
 ## What it does not do
 

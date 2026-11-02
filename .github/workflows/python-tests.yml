@@ -39,7 +39,7 @@ jobs:
 
       - name: Regenerated results match the committed full-scale artifacts
         run: |
-          for f in coordinator_ranking.json data_quality.json evidence_manifest.json findings.csv trajectories.json; do
+          for f in coordinator_ranking.json credential_reuse.json data_quality.json evidence_manifest.json findings.csv trajectories.json; do
             diff -u "artifacts/full_scale/$f" "work/results/$f"
           done
           python -c 'import json; a=json.load(open("artifacts/full_scale/summary.json")); b=json.load(open("work/results/summary.json")); [d.pop("runtime_seconds") for d in (a, b)]; assert a == b, "summary.json differs beyond runtime_seconds"'

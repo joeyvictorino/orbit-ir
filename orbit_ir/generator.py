@@ -202,6 +202,14 @@ def generate_dataset(output_dir: Path, config: LabConfig) -> dict:
     _write_jsonl(output_dir / "transcripts.jsonl", transcript_rows)
     _write_jsonl(output_dir / "control_plane.jsonl", control_rows)
 
+    credential_agent_sets: dict[str, set[str]] = {}
+    for row in control_rows:
+        cred = row["credential_id"]
+        credential_agent_sets.setdefault(cred, set()).add(row["agent_id"])
+    shared_credential_count = sum(
+        1 for agents_set in credential_agent_sets.values() if len(agents_set) > 1
+    )
+
     truth = {
         "config": asdict(config),
         "participating_agents": sorted(participants),
@@ -209,6 +217,7 @@ def generate_dataset(output_dir: Path, config: LabConfig) -> dict:
         "spoofed_tool_call_ids": sorted(spoofed_tool_call_ids),
         "unbacked_completion_tool_call_ids": sorted(unbacked_completion_ids),
         "oracle_modification_tool_call_ids": sorted(oracle_modification_ids),
+        "shared_credential_count": shared_credential_count,
         "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
         "synthetic": True,
     }

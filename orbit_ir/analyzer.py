@@ -284,6 +284,19 @@ def analyze_dataset(
                 "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
             })
 
+    credential_agents: dict[str, set[str]] = defaultdict(set)
+    credential_lines: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    for tool_call_id, controls in controls_by_call.items():
+        for line_number, row in controls:
+            cred = row.get("credential_id")
+            if cred:
+                credential_agents[cred].add(row["agent_id"])
+                credential_lines[cred].append((tool_call_id, line_number))
+    shared_credentials = sorted(
+        cred for cred, agents_set in credential_agents.items()
+        if len(agents_set) > 1
+    )
+
     coordinator_ranking = [
         {"agent_id": agent, "assignment_count": count}
         for agent, count in assignment_counts.most_common()
@@ -338,6 +351,7 @@ def analyze_dataset(
             "top_coordinators": [item["agent_id"] for item in coordinator_ranking[:10]],
             "coordinators_over_threshold": len(detected_coordinators),
             "trajectory_records": len(trajectories),
+            "shared_credentials": len(shared_credentials),
             "reason_counts": dict(sorted(reason_counts.items())),
         },
         "method": {
@@ -383,6 +397,18 @@ def analyze_dataset(
     )
     (output_dir / "data_quality.json").write_text(
         json.dumps({"duplicate_message_ids": duplicate_message_ids}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    credential_reuse_records = [
+        {
+            "credential_id": cred,
+            "agent_count": len(credential_agents[cred]),
+            "agents": sorted(credential_agents[cred]),
+        }
+        for cred in shared_credentials
+    ]
+    (output_dir / "credential_reuse.json").write_text(
+        json.dumps(credential_reuse_records, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -452,6 +478,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 2. Independent control-plane evidence contradicted {findings['transcript_tool_call_mismatches']:,} transcript tool-call records.
 5. {findings['unbacked_completions']:,} tool calls claimed completion but their independent check failed (unbacked completions).
 6. {findings['oracle_integrity_violations']:,} tool calls modified protected test expectations (oracle integrity violations).
+7. {findings['shared_credentials']:,} workload credentials were used by more than one agent (credential reuse).
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 

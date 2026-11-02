@@ -19,10 +19,10 @@
       "sha256": "b9160c97e2ce496bf8757ab2866391b9b8345be8277fd988792ca579e8c8cc10"
     },
     {
-      "bytes": 15655,
+      "bytes": 15688,
       "name": "ground_truth.json",
       "role": "evaluation-only",
-      "sha256": "e5a102055d070637f8c1920c715390d4137ef042182c84df0165c89ec230ff35"
+      "sha256": "83c5e3e256ee1a71a5a94811b807545f493a30ae226b1ebd4db88a5486fff47f"
     }
   ],
   "synthetic": true

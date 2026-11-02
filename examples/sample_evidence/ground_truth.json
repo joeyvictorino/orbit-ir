@@ -47,6 +47,7 @@
     "agent-0039"
   ],
   "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
+  "shared_credential_count": 33,
   "spoofed_tool_call_ids": [
     "tool-000018",
     "tool-000043",

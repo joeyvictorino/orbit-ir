@@ -179,6 +179,25 @@ class LabTest(unittest.TestCase):
             text = (root / "results" / "findings.csv").read_text(encoding="utf-8")
             self.assertIn("oracle-integrity-violation", text)
 
+    def test_credential_reuse_detected_across_agents(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=60, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(root / "evidence", root / "results")
+            self.assertGreater(summary["findings"]["shared_credentials"], 0)
+            reuse = json.loads((root / "results" / "credential_reuse.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(reuse, list)
+            self.assertGreater(len(reuse), 0)
+            first = reuse[0]
+            self.assertIn("credential_id", first)
+            self.assertIn("agents", first)
+            self.assertGreater(first["agent_count"], 1)
+
     def test_malformed_json_reports_the_exact_source_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
