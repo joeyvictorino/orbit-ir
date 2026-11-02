@@ -114,7 +114,7 @@ from .data_staging import analyze_staging, format_text as format_staging_text, f
 from .privilege_abuse import analyze_privilege_abuse, format_text as format_privabuse_text, format_json as format_privabuse_json, _load_events as _load_privabuse_events
 from .tool_misuse import analyze_tool_misuse, format_text as format_toolmisuse_text, format_json as format_toolmisuse_json, _load_events as _load_toolmisuse_events
 from .sandbox_escape import analyze_sandbox_escape, format_text as format_escape_text, format_json as format_escape_json, _load_events as _load_escape_events
-from .supply_chain import analyze_supply_chain, format_text as format_sc_text, format_json as format_sc_json, _load_events as _load_sc_events
+from .supply_chain import analyze as analyze_supply_chain, format_text as format_sc_text, format_json as format_sc_json, _load_events as _load_sc_events
 from .api_abuse import analyze_api_abuse, format_text as format_apiabuse_text, format_json as format_apiabuse_json, _load_events as _load_apiabuse_events
 from .memory_forensics import analyze_memory_forensics, format_text as format_memfor_text, format_json as format_memfor_json, _load_events as _load_memfor_events
 from .command_inject import analyze_command_inject, format_text as format_cmdinject_text, format_json as format_cmdinject_json, _load_events as _load_cmdinject_events
