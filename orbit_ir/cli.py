@@ -2539,20 +2539,6 @@ def _run(args: argparse.Namespace) -> None:
         else:
             print(output, end="")
         return
-    elif args.command == "steganography":
-        events = _load_stego_events(args.evidence_dir)
-        report = analyze_steganography(events)
-        if args.format == "json":
-            output = format_stego_json(report)
-        else:
-            output = format_stego_text(report)
-        if args.output:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(output, encoding="utf-8")
-            print(f"Steganography analysis written to {args.output}", file=sys.stderr)
-        else:
-            print(output, end="")
-        return
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"
