@@ -45,6 +45,8 @@ from .tag import tag_events, list_tags, filter_by_tag, format_tag_text
 from .search import search_evidence as search_evidence_fn, format_search_text
 from .report_gen import generate_report, ReportConfig
 from .chain import parse_chain, run_chain, format_chain_text
+from .sample import sample_evidence, format_sample_text
+from .anonymize import anonymize_evidence, format_anonymize_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -305,6 +307,22 @@ def build_parser() -> argparse.ArgumentParser:
     ch.add_argument("--pipeline", type=Path, required=True, help="Pipeline YAML file")
     ch.add_argument("--input", type=Path, required=True, help="Base evidence directory")
     ch.add_argument("--work-dir", type=Path, default=None, help="Working directory for intermediate outputs")
+
+    samp = subparsers.add_parser("sample", help="Downsample evidence for testing or exploration")
+    samp.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    samp.add_argument("--output", type=Path, required=True, help="Output directory for sampled evidence")
+    samp.add_argument("--count", type=int, default=None, help="Maximum events per source file")
+    samp.add_argument("--percent", type=float, default=None, help="Percentage of events to keep (0-100)")
+    samp.add_argument("--stratify-by", default=None, help="Field to stratify by (e.g. agent_id)")
+    samp.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    samp.add_argument("--format", choices=["text", "json"], default="text")
+
+    anon = subparsers.add_parser("anonymize", help="Redact identifiers with consistent pseudonyms for safe sharing")
+    anon.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    anon.add_argument("--output", type=Path, required=True, help="Output directory for anonymized evidence")
+    anon.add_argument("--salt", default="orbit-ir", help="Salt for pseudonym generation")
+    anon.add_argument("--save-mapping", action="store_true", help="Save original->pseudonym mapping to file")
+    anon.add_argument("--format", choices=["text", "json"], default="text")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -618,6 +636,27 @@ def _run(args: argparse.Namespace) -> None:
         print(format_chain_text(result), end="")
         if result["failed"] > 0:
             raise SystemExit(1)
+        return
+    elif args.command == "sample":
+        result = sample_evidence(
+            args.input, args.output,
+            count=args.count, percent=args.percent,
+            stratify_by=args.stratify_by, seed=args.seed,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_sample_text(result), end="")
+        return
+    elif args.command == "anonymize":
+        result = anonymize_evidence(
+            args.input, args.output,
+            salt=args.salt, save_mapping=args.save_mapping,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_anonymize_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
