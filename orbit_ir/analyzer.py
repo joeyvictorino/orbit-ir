@@ -1058,6 +1058,103 @@ def _render_statistics_table(findings_summary: dict) -> str:
     return "\n".join(lines)
 
 
+_DETECTION_METHODOLOGY: dict[str, dict[str, str]] = {
+    "tool-name-mismatch": {
+        "description": "Compares the tool name claimed in the agent transcript against the actual tool name recorded by the independent control plane for the same tool_call_id.",
+        "evidence": "transcripts.jsonl (claimed_tool) vs. control_plane.jsonl (actual_tool)",
+        "implication": "The agent misrepresented which tool it called, potentially to hide a destructive or unauthorized operation behind a benign-looking name.",
+    },
+    "argument-digest-mismatch": {
+        "description": "Compares SHA-256 digests of claimed vs. actual arguments for matched tool calls.",
+        "evidence": "transcripts.jsonl (claimed_args_digest) vs. control_plane.jsonl (actual_args_digest)",
+        "implication": "The agent passed different arguments than it reported, possibly to conceal the true parameters of an operation.",
+    },
+    "unbacked-completion": {
+        "description": "Detects tool calls where the agent claimed task completion but the independent verification check did not pass.",
+        "evidence": "transcripts.jsonl (tool_call_id) vs. control_plane.jsonl (policy_decision)",
+        "implication": "The agent reported success without the work actually being done or verified, undermining task reliability.",
+    },
+    "oracle-integrity-violation": {
+        "description": "Detects writes to protected test expectation files (tests/, spec/, fixtures/) that serve as oracle data for the validation pipeline.",
+        "evidence": "control_plane.jsonl (resource path, effect=write)",
+        "implication": "Modifying oracle expectations can make failing tests pass, subverting the entire verification system.",
+    },
+    "agent-id-mismatch": {
+        "description": "Compares the agent_id in the transcript against the agent_id in the control-plane record for the same tool call.",
+        "evidence": "transcripts.jsonl (agent_id) vs. control_plane.jsonl (agent_id)",
+        "implication": "Identity confusion or impersonation: one agent's actions are attributed to another.",
+    },
+    "trace-id-mismatch": {
+        "description": "Compares trace_id values between transcript and control-plane records for matched tool calls.",
+        "evidence": "transcripts.jsonl (trace_id) vs. control_plane.jsonl (trace_id)",
+        "implication": "Trace chain was broken or tampered with, making it harder to reconstruct the sequence of operations.",
+    },
+    "missing-transcript": {
+        "description": "Finds control-plane events with no matching transcript record (by tool_call_id).",
+        "evidence": "control_plane.jsonl tool_call_ids not in transcripts.jsonl",
+        "implication": "The agent's own log was suppressed or deleted for these operations, suggesting evidence destruction.",
+    },
+    "missing-control-plane-event": {
+        "description": "Finds transcript records with no matching control-plane event (by tool_call_id).",
+        "evidence": "transcripts.jsonl tool_call_ids not in control_plane.jsonl",
+        "implication": "Operations claimed in the transcript were never independently observed, or their control-plane records were deleted.",
+    },
+    "lateral-resource-access": {
+        "description": "Detects when an agent accesses resources explicitly assigned to a different agent, based on resource ownership mapping.",
+        "evidence": "control_plane.jsonl (agent_id, resource) vs. resource ownership assignments",
+        "implication": "Unauthorized cross-boundary access: the agent reached into another agent's domain.",
+    },
+}
+
+
+def _render_detection_methodology(findings_summary: dict) -> str:
+    fired_reasons: set[str] = set()
+    for tc in findings_summary.get("mitre_technique_counts", {}):
+        pass
+    records = findings_summary.get("trajectory_records", 0)
+    mismatches = findings_summary.get("transcript_tool_call_mismatches", 0)
+    unbacked = findings_summary.get("unbacked_completions", 0)
+    oracle = findings_summary.get("oracle_integrity_violations", 0)
+    lateral = findings_summary.get("lateral_movement_detections", 0)
+
+    if mismatches > 0:
+        fired_reasons |= {"tool-name-mismatch", "argument-digest-mismatch"}
+    if unbacked > 0:
+        fired_reasons.add("unbacked-completion")
+    if oracle > 0:
+        fired_reasons.add("oracle-integrity-violation")
+    if lateral > 0:
+        fired_reasons.add("lateral-resource-access")
+    fired_reasons |= {"agent-id-mismatch", "trace-id-mismatch", "missing-transcript", "missing-control-plane-event"}
+
+    if not fired_reasons:
+        return ""
+
+    lines = [
+        "## Detection methodology",
+        "",
+        "Each detection type below ran during this analysis. The table documents what each examines, "
+        "what evidence it uses, and what a positive finding means for incident responders.",
+        "",
+        "| Detection | Evidence sources | What it means |",
+        "| --- | --- | --- |",
+    ]
+    for reason in sorted(fired_reasons):
+        meta = _DETECTION_METHODOLOGY.get(reason, {})
+        if not meta:
+            continue
+        mitre = MITRE_TECHNIQUES.get(reason, {})
+        mitre_ref = f" ({mitre['id']})" if mitre else ""
+        lines.append(
+            f"| **{reason}**{mitre_ref} | {meta['evidence']} | {meta['implication']} |"
+        )
+
+    lines.append("")
+    lines.append("All detections are deterministic and source-linked. No LLM is involved in detection logic.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None, clusters: list[dict] | None = None, lateral_movement: list[dict] | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
@@ -1130,6 +1227,7 @@ The composite risk score weights detection types by operational severity. Compon
 {_render_mitre_section(findings)}
 {_render_data_quality(data_quality or {})}
 {evaluation_section}
+{_render_detection_methodology(findings)}
 ## Evidence model
 
 `workload identity -> agent -> tool call -> credential -> resource -> effect -> control decision`

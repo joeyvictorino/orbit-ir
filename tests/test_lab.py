@@ -679,5 +679,24 @@ class LabTest(unittest.TestCase):
             self.assertEqual(eval_result["false_negative"], 0)
 
 
+    def test_detection_methodology_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=42,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Detection methodology", report)
+            self.assertIn("tool-name-mismatch", report)
+            self.assertIn("All detections are deterministic", report)
+
+
 if __name__ == "__main__":
     unittest.main()
