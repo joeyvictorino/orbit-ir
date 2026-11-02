@@ -73,6 +73,8 @@ from .blast_radius import estimate_blast_radius, format_blast_radius_text
 from .remediate_ir import generate_remediations, format_remediate_text
 from .frequency import build_frequency as build_freq, format_frequency_text, load_and_build as load_frequency
 from .outlier import detect_outliers, format_outlier_text, load_and_detect as load_outliers
+from .playbook import generate_playbook, format_playbook_text
+from .risk_score import compute_risk_score, format_risk_score_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -505,6 +507,17 @@ def build_parser() -> argparse.ArgumentParser:
     rem.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     rem.add_argument("--severity", default=None, help="Minimum severity filter (critical, high, medium, low)")
     rem.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    pb = subparsers.add_parser("playbook", help="Generate incident response playbooks from evidence")
+    pb.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    pb.add_argument("--format", choices=["text", "json", "markdown"], default="text", help="Output format")
+    pb.add_argument("--severity", default=None, help="Minimum severity threshold")
+    pb.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rs = subparsers.add_parser("risk-score", help="Compute composite risk score from findings")
+    rs.add_argument("--input", type=Path, required=True, help="Findings JSON file or evidence directory")
+    rs.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    rs.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1224,6 +1237,37 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Remediation report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "playbook":
+        gen = generate_playbook(args.input, severity_threshold=args.severity)
+        data = gen.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        elif args.format == "markdown":
+            from .playbook import format_playbook_markdown
+            output = format_playbook_markdown(data)
+        else:
+            output = format_playbook_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Playbook written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "risk-score":
+        result = compute_risk_score(args.input)
+        data = result.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_risk_score_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Risk score report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
