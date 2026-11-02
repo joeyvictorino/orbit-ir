@@ -75,6 +75,8 @@ from .frequency import build_frequency as build_freq, format_frequency_text, loa
 from .outlier import detect_outliers, format_outlier_text, load_and_detect as load_outliers
 from .playbook import generate_playbook, format_playbook_text
 from .risk_score import compute_risk_score, format_risk_score_text
+from .timeline_export import export_timeline, TimelineExporter
+from .agent_profile import profile_evidence_agents, format_agent_profile_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -518,6 +520,20 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--input", type=Path, required=True, help="Findings JSON file or evidence directory")
     rs.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     rs.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    te = subparsers.add_parser("timeline-export", help="Export incident timeline in multiple formats (CSV, ICS, Gantt, Markdown)")
+    te.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    te.add_argument("--format", choices=["csv", "ics", "gantt", "markdown"], default="csv", help="Export format")
+    te.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    te.add_argument("--agent", default=None, help="Filter to specific agent")
+    te.add_argument("--since", default=None, help="Only events after this ISO timestamp")
+
+    ap = subparsers.add_parser("agent-profile", help="Build behavioral profiles for each agent")
+    ap.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    ap.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ap.add_argument("--agent", default=None, help="Filter to specific agent")
+    ap.add_argument("--min-risk", type=float, default=0.0, help="Minimum risk score to show (default: 0)")
+    ap.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1268,6 +1284,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Risk score report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "timeline-export":
+        output = export_timeline(
+            args.input, fmt=args.format,
+            agent=args.agent, since=args.since,
+        )
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Timeline exported to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "agent-profile":
+        profiler = profile_evidence_agents(
+            args.input, agent=args.agent, min_risk=args.min_risk,
+        )
+        data = profiler.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_agent_profile_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Agent profiles written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
