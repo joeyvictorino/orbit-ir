@@ -139,6 +139,8 @@ from .alert_fatigue import analyze_alert_fatigue, format_text as format_af_text,
 from .decision_tree import analyze_decision_tree, format_text as format_dt_text, format_json as format_dt_json, _load_events as _load_dt_events
 from .log_anomaly import analyze_log_anomalies, format_text as format_la_text, format_json as format_la_json, _load_events as _load_la_events
 from .agent_drift import analyze_agent_drift, format_text as format_ad_text, format_json as format_ad_json, _load_events as _load_ad_events
+from .response_time import analyze_response_times, format_text as format_rt_text, format_json as format_rt_json, _load_events as _load_rt_events
+from .action_sequence import analyze_action_sequences, format_text as format_as_text, format_json as format_as_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -943,6 +945,19 @@ def build_parser() -> argparse.ArgumentParser:
     ad_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     ad_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     ad_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rt_p = subparsers.add_parser("response-time", help="Analyze incident response timing metrics")
+    rt_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    rt_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    rt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    rt_p.add_argument("--detection-types", nargs="*", default=None, help="Custom detection event types")
+
+    as_p = subparsers.add_parser("action-sequence", help="Mine action sequence patterns from agent logs")
+    as_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    as_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    as_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    as_p.add_argument("--min-frequency", type=int, default=2, help="Minimum pattern frequency")
+    as_p.add_argument("--max-length", type=int, default=5, help="Maximum sequence length")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2676,6 +2691,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Agent drift analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "response-time":
+        events = _load_rt_events(args.evidence_dir)
+        report = analyze_response_times(events, detection_types=args.detection_types)
+        if args.format == "json":
+            output = format_rt_json(report)
+        else:
+            output = format_rt_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Response time analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "action-sequence":
+        events = _load_rt_events(args.evidence_dir)
+        report = analyze_action_sequences(events, min_frequency=args.min_frequency, max_sequence_length=args.max_length)
+        if args.format == "json":
+            output = format_as_json(report)
+        else:
+            output = format_as_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Action sequence analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
