@@ -149,6 +149,10 @@ from .privilege_chain import analyze as analyze_privilege_chain, format_text as 
 from .resource_abuse import analyze as analyze_resource_abuse, format_text as format_ra_text, format_json as format_ra_json, _load_events as _load_ra_events
 from .event_timeline_gap import analyze_timeline_gaps, format_text as format_etg_text, format_json as format_etg_json, _load_events as _load_etg_events
 from .agent_handoff import analyze_handoffs, format_text as format_ah_text, format_json as format_ah_json, _load_events as _load_ah_events
+from .credential_replay import analyze as analyze_credential_replay, format_text as format_creplay_text, format_json as format_creplay_json, _load_events as _load_creplay_events
+from .agent_collusion import analyze as analyze_agent_collusion, format_text as format_collusion_text, format_json as format_collusion_json, _load_events as _load_collusion_events
+from .evidence_replay import analyze as analyze_evidence_replay, format_text as format_ereplay_text, format_json as format_ereplay_json
+from .anomaly_correlate import analyze as analyze_anomaly_correlate, format_text as format_acorr_text, format_json as format_acorr_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1018,6 +1022,19 @@ def build_parser() -> argparse.ArgumentParser:
     ah_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     ah_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
     ah_p.add_argument("--handoff-gap", type=float, default=5.0, help="Maximum gap between events to count as a handoff")
+
+    creplay_p = subparsers.add_parser("credential-replay", help="Detect credential replay attacks in agent evidence")
+    creplay_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    creplay_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    creplay_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    creplay_p.add_argument("--gap-threshold", type=float, default=3600.0, help="Temporal gap threshold in seconds")
+
+    collusion_p = subparsers.add_parser("agent-collusion", help="Detect coordinated malicious behavior between agents")
+    collusion_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    collusion_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    collusion_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    collusion_p.add_argument("--sync-window", type=float, default=5.0, help="Time window for synchronized action detection")
+    collusion_p.add_argument("--escalation-window", type=float, default=120.0, help="Time window for coordinated escalation detection")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2877,6 +2894,36 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Agent handoff analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "credential-replay":
+        events, control = _load_creplay_events(args.evidence_dir)
+        report = analyze_credential_replay(events, control, gap_threshold=args.gap_threshold)
+        if args.format == "json":
+            output = format_creplay_json(report)
+        else:
+            output = format_creplay_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Credential replay analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "agent-collusion":
+        events, control = _load_collusion_events(args.evidence_dir)
+        report = analyze_agent_collusion(events, control,
+                                          sync_window=args.sync_window,
+                                          escalation_window=args.escalation_window)
+        if args.format == "json":
+            output = format_collusion_json(report)
+        else:
+            output = format_collusion_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Agent collusion analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
