@@ -119,6 +119,7 @@ from .api_abuse import analyze_api_abuse, format_text as format_apiabuse_text, f
 from .memory_forensics import analyze_memory_forensics, format_text as format_memfor_text, format_json as format_memfor_json, _load_events as _load_memfor_events
 from .command_inject import analyze_command_inject, format_text as format_cmdinject_text, format_json as format_cmdinject_json, _load_events as _load_cmdinject_events
 from .file_access import analyze_file_access, format_text as format_fileaccess_text, format_json as format_fileaccess_json, _load_events as _load_fileaccess_events
+from .prompt_inject import analyze_prompt_inject, format_text as format_promptinject_text, format_json as format_promptinject_json, _load_events as _load_promptinject_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -820,6 +821,11 @@ def build_parser() -> argparse.ArgumentParser:
     fileaccess_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     fileaccess_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     fileaccess_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    promptinject_p = subparsers.add_parser("prompt-inject", help="Detect prompt injection attempts in agent inputs")
+    promptinject_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    promptinject_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    promptinject_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2271,6 +2277,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"File access report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "prompt-inject":
+        evidence_events = _load_promptinject_events(args.evidence_dir)
+        report = analyze_prompt_inject(evidence_events)
+        if args.format == "json":
+            output = format_promptinject_json(report)
+        else:
+            output = format_promptinject_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Prompt injection report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
