@@ -1232,6 +1232,16 @@ def build_parser() -> argparse.ArgumentParser:
     ts_p.add_argument("--format", choices=["text", "json"], default="text")
     ts_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
+    np_p = subparsers.add_parser("network-pivot", help="Detect network pivoting patterns in agent behavior")
+    np_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    np_p.add_argument("--format", choices=["text", "json"], default="text")
+    np_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    op_p = subparsers.add_parser("output-poisoning", help="Detect output poisoning patterns in agent behavior")
+    op_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    op_p.add_argument("--format", choices=["text", "json"], default="text")
+    op_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -3614,6 +3624,46 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Token smuggle analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "network-pivot":
+        from orbit_ir.network_pivot import (
+            analyze_network_pivoting,
+            format_json as format_np_json,
+            format_text as format_np_text,
+        )
+        from orbit_ir.network_pivot import _load_events as _load_np_events
+        events = _load_np_events(str(args.evidence_dir))
+        report = analyze_network_pivoting(events)
+        if args.format == "json":
+            output = format_np_json(report)
+        else:
+            output = format_np_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Network pivot analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "output-poisoning":
+        from orbit_ir.output_poisoning import (
+            analyze_output_poisoning,
+            format_json as format_op_json,
+            format_text as format_op_text,
+        )
+        from orbit_ir.output_poisoning import _load_events as _load_op_events
+        events = _load_op_events(str(args.evidence_dir))
+        report = analyze_output_poisoning(events)
+        if args.format == "json":
+            output = format_op_json(report)
+        else:
+            output = format_op_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Output poisoning analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
