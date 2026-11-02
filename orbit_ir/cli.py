@@ -18,6 +18,7 @@ from .diff import diff_results, format_diff_text
 from .comm_graph import load_and_build as load_comm_graph, format_dot as format_comm_dot, format_summary as format_comm_summary
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
+from .timeline import build_timeline, format_json as format_timeline_json, format_text as format_timeline_text
 from .validate import validate_evidence
 from .merge import merge_evidence
 from .fingerprint import fingerprint_agents, format_fingerprint_text
@@ -120,6 +121,13 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--inputs", type=Path, nargs="+", required=True, help="Evidence directories to merge")
     merge.add_argument("--out", type=Path, required=True, help="Output directory for merged evidence")
 
+    tl = subparsers.add_parser("timeline", help="Merge evidence into a single chronological event stream")
+    tl.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    tl.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+    tl.add_argument("--source", choices=["messages", "transcripts", "control_plane"], default=None,
+                    help="Filter to a single evidence source")
+    tl.add_argument("--agent", default=None, help="Filter to events from this agent ID")
+
     fp = subparsers.add_parser("fingerprint", help="Compute agent behavior fingerprints and anomaly scores")
     fp.add_argument("--input", type=Path, required=True, help="Evidence directory")
     fp.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
@@ -195,6 +203,17 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "merge":
         result = merge_evidence(args.inputs, args.out)
         print(json.dumps(result, sort_keys=True, indent=2))
+        return
+    elif args.command == "timeline":
+        events = build_timeline(args.input)
+        if args.source:
+            events = [e for e in events if e.get("source") == args.source]
+        if args.agent:
+            events = [e for e in events if e.get("agent_id") == args.agent]
+        if args.format == "json":
+            print(format_timeline_json(events), end="")
+        else:
+            print(format_timeline_text(events), end="")
         return
     elif args.command == "fingerprint":
         result = fingerprint_agents(args.input)
