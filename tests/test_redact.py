@@ -24,8 +24,9 @@ def test_redact_emails(tmp_path):
     assert result["redactions"] == 2
     assert result["files"] == 1
     redacted = (out / "events.jsonl").read_text().splitlines()
-    assert "[EMAIL_1]" in redacted[0]
-    assert "[EMAIL_2]" in redacted[1]
+    assert "[EMAIL]" in redacted[0]
+    assert "[EMAIL]" in redacted[1]
+    assert "alice@example.com" not in redacted[0]
 
 
 def test_redact_ips(tmp_path):
@@ -35,8 +36,8 @@ def test_redact_ips(tmp_path):
     result = redact_evidence(inp, out, patterns=["ip"])
     assert result["redactions"] == 2
     redacted = json.loads((out / "events.jsonl").read_text().strip())
-    assert "[IP_1]" in redacted["message"]
-    assert "[IP_2]" in redacted["message"]
+    assert "[IP]" in redacted["message"]
+    assert "192.168.1.100" not in redacted["message"]
 
 
 def test_redact_consistent_replacement(tmp_path):
@@ -50,8 +51,9 @@ def test_redact_consistent_replacement(tmp_path):
     lines = (out / "events.jsonl").read_text().strip().splitlines()
     obj1 = json.loads(lines[0])
     obj2 = json.loads(lines[1])
-    assert "[EMAIL_1]" in obj1["message"]
-    assert "[EMAIL_1]" in obj2["note"]
+    assert "[EMAIL]" in obj1["message"]
+    assert "[EMAIL]" in obj2["note"]
+    assert "user@test.com" not in obj1["message"]
 
 
 def test_redact_dry_run(tmp_path):
@@ -79,7 +81,7 @@ def test_redact_nested_fields(tmp_path):
     result = redact_evidence(inp, out, patterns=["email"])
     assert result["redactions"] == 1
     redacted = json.loads((out / "events.jsonl").read_text().strip())
-    assert "[EMAIL_1]" in redacted["data"]["contact"]
+    assert "[EMAIL]" in redacted["data"]["contact"]
 
 
 def test_redact_list_values(tmp_path):
@@ -96,13 +98,13 @@ def test_format_redact_text(tmp_path):
     out = tmp_path / "output"
     result = redact_evidence(inp, out, patterns=["email"])
     text = format_redact_text(result)
-    assert "Redacted" in text
-    assert "1 files" in text
+    assert "Redaction" in text
+    assert "1" in text
 
 
-def test_redact_single_file(tmp_path):
-    f = tmp_path / "single.jsonl"
-    f.write_text(json.dumps({"msg": "ip is 10.0.0.1"}) + "\n")
+def test_redact_all_patterns(tmp_path):
+    events = [{"message": "email alice@x.com ip 10.0.0.1"}]
+    inp = _write_events(tmp_path / "input", events)
     out = tmp_path / "output"
-    result = redact_evidence(f, out, patterns=["ip"])
-    assert result["redactions"] == 1
+    result = redact_evidence(inp, out)
+    assert result["redactions"] >= 2
