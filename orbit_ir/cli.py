@@ -169,6 +169,8 @@ from .token_exfil import analyze_token_exfil, format_text as format_te_text, for
 from .replay_attack import analyze_replay_attack, format_text as format_ra_text, format_json as format_ra_json, _load_events as _load_ra_events
 from .model_poisoning import analyze_model_poisoning, format_text as format_mp_text, format_json as format_mp_json, _load_events as _load_mp_events
 from .identity_spoof import analyze_identity_spoof, format_text as format_is_text, format_json as format_is_json, _load_events as _load_is_events
+from .dns_tunnel import analyze_dns_tunneling, format_text as format_dnst_text, format_json as format_dnst_json, _load_events as _load_dnst_events
+from .session_hijack import analyze_session_hijack, format_text as format_sh_text, format_json as format_sh_json, _load_events as _load_sh_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1143,6 +1145,16 @@ def build_parser() -> argparse.ArgumentParser:
     is_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     is_p.add_argument("--format", choices=["text", "json"], default="text")
     is_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dnst_p = subparsers.add_parser("dns-tunnel", help="Detect DNS tunneling patterns")
+    dnst_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    dnst_p.add_argument("--format", choices=["text", "json"], default="text")
+    dnst_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sh_p = subparsers.add_parser("session-hijack", help="Detect session hijacking patterns")
+    sh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    sh_p.add_argument("--format", choices=["text", "json"], default="text")
+    sh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3300,6 +3312,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Identity spoof analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "dns-tunnel":
+        events = _load_dnst_events(str(args.evidence_dir))
+        report = analyze_dns_tunneling(events)
+        if args.format == "json":
+            output = format_dnst_json(report)
+        else:
+            output = format_dnst_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"DNS tunnel analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "session-hijack":
+        events = _load_sh_events(str(args.evidence_dir))
+        report = analyze_session_hijack(events)
+        if args.format == "json":
+            output = format_sh_json(report)
+        else:
+            output = format_sh_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Session hijack analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
