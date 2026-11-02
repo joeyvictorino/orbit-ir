@@ -107,6 +107,8 @@ from .exfil_detect import analyze_exfiltration, format_text as format_exfil_text
 from .c2_detect import analyze_c2, format_text as format_c2_text, format_json as format_c2_json, _load_events as _load_c2_events
 from .persistence_detect import analyze_persistence, format_text as format_persist_text, format_json as format_persist_json, _load_events as _load_persist_events
 from .defense_evasion import analyze_defense_evasion, format_text as format_evasion_text, format_json as format_evasion_json, _load_events as _load_evasion_events
+from .lateral_path import analyze_lateral, format_text as format_lateral_text, format_json as format_lateral_json, _load_events as _load_lateral_events
+from .credential_harvest import analyze_harvest, format_text as format_harvest_text, format_json as format_harvest_json, _load_events as _load_harvest_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -748,6 +750,16 @@ def build_parser() -> argparse.ArgumentParser:
     evasion_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     evasion_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     evasion_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    lateral_p = subparsers.add_parser("lateral-path", help="Reconstruct lateral movement paths between agents and hosts")
+    lateral_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    lateral_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    lateral_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    harvest_p = subparsers.add_parser("credential-harvest", help="Detect credential harvesting patterns mapped to MITRE ATT&CK")
+    harvest_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    harvest_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    harvest_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2031,6 +2043,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Defense evasion report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "lateral-path":
+        evidence_events = _load_lateral_events(args.evidence_dir)
+        report = analyze_lateral(evidence_events)
+        if args.format == "json":
+            output = format_lateral_json(report)
+        else:
+            output = format_lateral_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Lateral path report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "credential-harvest":
+        evidence_events = _load_harvest_events(args.evidence_dir)
+        report = analyze_harvest(evidence_events)
+        if args.format == "json":
+            output = format_harvest_json(report)
+        else:
+            output = format_harvest_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Credential harvest report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
