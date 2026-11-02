@@ -32,6 +32,8 @@ from .dedup import deduplicate_findings, format_dedup_summary
 from .audit import audit_reproducibility, format_audit_text
 from .bundle import create_bundle, format_bundle_text
 from .compare_agents import compare_agents, format_comparison_text
+from .replay import replay_events, format_replay_text
+from .enrich import enrich_evidence, format_enrich_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -201,6 +203,18 @@ def build_parser() -> argparse.ArgumentParser:
     cmp.add_argument("--agent-b", required=True, help="Second agent ID")
     cmp.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    rpl = subparsers.add_parser("replay", help="Chronological event replay with behavioral annotations")
+    rpl.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    rpl.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+    rpl.add_argument("--no-annotations", action="store_true", default=False,
+                     help="Disable behavioral annotations")
+
+    enr = subparsers.add_parser("enrich", help="Add metadata (tool docs, roles, risk tags) to evidence")
+    enr.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    enr.add_argument("--output", type=Path, required=True, help="Output directory for enriched evidence")
+    enr.add_argument("--enrichments", default=None,
+                     help="Comma-separated enrichments: tool_docs,agent_roles,risk_tags (default: all)")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -358,6 +372,18 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_comparison_text(result), end="")
+        return
+    elif args.command == "replay":
+        events = replay_events(args.input, annotate=not args.no_annotations)
+        if args.format == "json":
+            print(json.dumps(events, sort_keys=True, indent=2, default=str))
+        else:
+            print(format_replay_text(events, show_annotations=not args.no_annotations), end="")
+        return
+    elif args.command == "enrich":
+        enrichment_list = args.enrichments.split(",") if args.enrichments else None
+        result = enrich_evidence(args.input, args.output, enrichments=enrichment_list)
+        print(format_enrich_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
