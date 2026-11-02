@@ -1,8 +1,8 @@
-"""Supply chain attack pattern detection for agent evidence.
+"""Supply chain attack pattern detection in agent evidence.
 
-Analyzes agent events for indicators of supply chain attacks—dependency
-confusion, compromised package installations, malicious update patterns,
-and typosquatting attempts.
+Identifies attempts to compromise dependencies, inject malicious packages,
+tamper with build pipelines, substitute trusted components, and exploit
+package management systems used by AI agents.
 """
 from __future__ import annotations
 
@@ -14,394 +14,319 @@ from pathlib import Path
 from typing import Any
 
 
-ATTACK_TYPES = {
-    "dependency-confusion": "Internal package name resolved to public registry",
-    "compromised-package": "Installation of known-malicious or suspicious package",
-    "malicious-update": "Package update with suspicious version jump or payload",
-    "typosquat": "Package name similar to popular package (potential typosquat)",
+DEPENDENCY_POISON_KEYWORDS = {
+    "dependency confusion", "typosquat", "typo-squat", "name squatting",
+    "malicious package", "fake package", "compromised package",
+    "rogue dependency", "shadow dependency", "phantom dependency",
 }
 
-SUSPICIOUS_INSTALL_TOOLS = {
-    "pip_install", "npm_install", "install_package", "add_dependency",
-    "cargo_add", "go_get", "gem_install", "composer_require",
-    "execute_command", "run_shell",
+BUILD_TAMPER_KEYWORDS = {
+    "build pipeline", "ci/cd", "build script", "makefile",
+    "dockerfile", "build step", "pre-build", "post-build",
+    "build hook", "compile", "link", "inject build",
 }
 
-KNOWN_MALICIOUS_PATTERNS = {
-    "preinstall", "postinstall", "eval(", "exec(",
-    "base64_decode", "subprocess.call", "os.system",
-    "child_process", "curl |", "wget |",
+REGISTRY_ABUSE_KEYWORDS = {
+    "registry", "pypi", "npm", "rubygems", "maven",
+    "docker hub", "package index", "publish", "upload package",
+    "override package", "yank", "unpublish",
 }
 
-POPULAR_PACKAGES = {
-    "requests", "numpy", "pandas", "flask", "django", "express",
-    "react", "lodash", "axios", "tensorflow", "torch", "boto3",
-    "urllib3", "cryptography", "pillow", "setuptools",
+COMPONENT_SWAP_KEYWORDS = {
+    "swap model", "replace binary", "substitute", "downgrade",
+    "rollback", "pin version", "lock file", "integrity check",
+    "checksum mismatch", "hash mismatch", "signature invalid",
+    "unsigned", "unverified",
 }
 
-INTERNAL_REGISTRY_PATTERNS = {
-    "internal.", "corp.", "private.", "registry.local",
-    ".internal:", "artifactory.", "nexus.",
+UPDATE_HIJACK_KEYWORDS = {
+    "auto-update", "update mechanism", "update server",
+    "update channel", "ota", "hot patch", "live update",
+    "update proxy", "mitm update", "intercept update",
+}
+
+SUPPLY_CHAIN_TYPES = {
+    "dependency-poisoning",
+    "build-tampering",
+    "registry-abuse",
+    "component-substitution",
+    "update-hijacking",
 }
 
 
 @dataclass
-class SupplyChainDetection:
-    detection_id: str
-    agent_id: str
-    attack_type: str
-    severity: str
-    confidence: str
+class SupplyChainPattern:
     timestamp: str
-    tool: str
-    package: str
-    description: str
-    evidence: dict = field(default_factory=dict)
-
-
-@dataclass
-class AgentSupplyScore:
     agent_id: str
-    total_detections: int
-    attack_types: list[str]
-    risk_score: float
-    packages_flagged: list[str]
+    event_id: str
+    attack_type: str
+    evidence: str
+    target_component: str
+    technique: str
+    source_file: str
+    line: int
+    severity: str
+    matched_keywords: list[str] = field(default_factory=list)
 
 
 @dataclass
 class SupplyChainSummary:
-    total_detections: int
-    agents_involved: int
-    attack_types_found: list[str]
-    packages_flagged: int
-    highest_severity: str
+    total_patterns: int
+    by_type: dict[str, int] = field(default_factory=dict)
+    agents_attacking: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    medium_count: int = 0
+    components_targeted: int = 0
 
 
 @dataclass
 class SupplyChainReport:
-    detections: list[SupplyChainDetection]
+    patterns: list[SupplyChainPattern]
     summary: SupplyChainSummary
-    agent_scores: list[AgentSupplyScore]
+    agents_involved: list[str]
+    attack_chains: list[dict[str, Any]] = field(default_factory=list)
 
 
-_counter = 0
+def _match_keywords(text: str, keyword_set: set[str]) -> list[str]:
+    lower = text.lower()
+    return sorted(k for k in keyword_set if k in lower)
 
 
-def _next_id() -> str:
-    global _counter
-    _counter += 1
-    return f"SC-{_counter:04d}"
+def _detect_dependency_poison(event: dict[str, Any]) -> tuple[bool, list[str], str]:
+    content = event.get("content", "") + " " + event.get("message", "")
+    tool = event.get("tool", "")
+    full_text = content + " " + tool
+    matches = _match_keywords(full_text, DEPENDENCY_POISON_KEYWORDS)
+    if matches:
+        return True, matches, f"Dependency poisoning: {', '.join(matches)}"
+    return False, [], ""
 
 
-def _levenshtein(a: str, b: str) -> int:
-    if len(a) < len(b):
-        return _levenshtein(b, a)
-    if len(b) == 0:
-        return len(a)
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a):
-        curr = [i + 1]
-        for j, cb in enumerate(b):
-            curr.append(min(prev[j + 1] + 1, curr[j] + 1,
-                            prev[j] + (0 if ca == cb else 1)))
-        prev = curr
-    return prev[-1]
+def _detect_build_tamper(event: dict[str, Any]) -> tuple[bool, list[str], str]:
+    content = event.get("content", "") + " " + event.get("message", "")
+    args = json.dumps(event.get("args", {})) if event.get("args") else ""
+    full_text = content + " " + args
+    matches = _match_keywords(full_text, BUILD_TAMPER_KEYWORDS)
+    if matches:
+        return True, matches, f"Build tampering: {', '.join(matches)}"
+    return False, [], ""
 
 
-def _is_typosquat(name: str) -> str | None:
-    nl = name.lower().strip()
-    for pop in POPULAR_PACKAGES:
-        if nl == pop:
-            continue
-        dist = _levenshtein(nl, pop)
-        if 0 < dist <= 2 and len(nl) >= 3:
-            return pop
-    return None
+def _detect_registry_abuse(event: dict[str, Any]) -> tuple[bool, list[str], str]:
+    content = event.get("content", "") + " " + event.get("message", "")
+    matches = _match_keywords(content, REGISTRY_ABUSE_KEYWORDS)
+    if matches:
+        return True, matches, f"Registry abuse: {', '.join(matches)}"
+    return False, [], ""
 
 
-def _extract_package(event: dict) -> str:
-    pkg = event.get("package", "")
-    if pkg:
-        return pkg
-    resource = event.get("resource", "")
-    if resource:
-        parts = resource.split()
-        for p in parts:
-            if p and not p.startswith("-") and not p.startswith("/"):
-                return p
-    return ""
+def _detect_component_swap(event: dict[str, Any]) -> tuple[bool, list[str], str]:
+    content = event.get("content", "") + " " + event.get("message", "")
+    error = event.get("error", "")
+    full_text = content + " " + error
+    matches = _match_keywords(full_text, COMPONENT_SWAP_KEYWORDS)
+    if matches:
+        return True, matches, f"Component substitution: {', '.join(matches)}"
+    return False, [], ""
 
 
-def _severity_for_attack(attack_type: str, evidence_count: int) -> str:
-    if attack_type == "compromised-package":
-        return "critical"
-    if attack_type == "dependency-confusion":
-        return "critical" if evidence_count >= 2 else "high"
-    if attack_type == "malicious-update":
+def _detect_update_hijack(event: dict[str, Any]) -> tuple[bool, list[str], str]:
+    content = event.get("content", "") + " " + event.get("message", "")
+    matches = _match_keywords(content, UPDATE_HIJACK_KEYWORDS)
+    if matches:
+        return True, matches, f"Update hijacking: {', '.join(matches)}"
+    return False, [], ""
+
+
+def _classify_severity(attack_type: str, matches: list[str]) -> str:
+    if attack_type in ("dependency-poisoning", "build-tampering"):
+        return "critical" if len(matches) >= 2 else "high"
+    if attack_type == "component-substitution":
         return "high"
-    if attack_type == "typosquat":
-        return "high" if evidence_count >= 2 else "medium"
+    if len(matches) >= 3:
+        return "high"
     return "medium"
 
 
-def _detect_dependency_confusion(events: list[dict]) -> list[SupplyChainDetection]:
-    detections = []
-    for ev in events:
-        registry = ev.get("registry", "").lower()
-        resource = ev.get("resource", "").lower()
-        internal = ev.get("internal_package", False)
-
-        is_internal = internal
-        if not is_internal:
-            for pat in INTERNAL_REGISTRY_PATTERNS:
-                if pat in resource:
-                    is_internal = True
-                    break
-
-        public_registry = ev.get("public_registry", False)
-        if not public_registry and registry:
-            public_registry = any(r in registry for r in ("pypi.org", "npmjs.com", "registry.npmjs", "crates.io", "rubygems.org"))
-
-        if is_internal and public_registry:
-            pkg = _extract_package(ev)
-            sev = _severity_for_attack("dependency-confusion", 2)
-            detections.append(SupplyChainDetection(
-                detection_id=_next_id(),
-                agent_id=ev.get("agent_id", "unknown"),
-                attack_type="dependency-confusion",
-                severity=sev,
-                confidence="high",
-                timestamp=ev.get("timestamp", ""),
-                tool=ev.get("tool", ""),
-                package=pkg,
-                description=f"Internal package '{pkg}' resolved from public registry '{registry}'",
-                evidence={"registry": registry, "internal_package": True},
-            ))
-    return detections
+def _load_events(path: str | Path) -> list[dict[str, Any]]:
+    p = Path(path)
+    events: list[dict[str, Any]] = []
+    if not p.exists():
+        return events
+    with open(p) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    return events
 
 
-def _detect_compromised_package(events: list[dict]) -> list[SupplyChainDetection]:
-    detections = []
-    for ev in events:
-        tool = ev.get("tool", "").lower()
-        resource = ev.get("resource", "").lower()
-        params = ev.get("parameters", {})
-        scripts = ev.get("scripts", {})
+def analyze(
+    events: list[dict[str, Any]],
+    control_events: list[dict[str, Any]] | None = None,
+) -> SupplyChainReport:
+    if control_events is None:
+        control_events = []
 
-        if tool not in SUSPICIOUS_INSTALL_TOOLS and "install" not in tool:
-            continue
+    patterns: list[SupplyChainPattern] = []
+    seen: set[tuple[str, str, str]] = set()
 
-        matches = []
-        for pat in KNOWN_MALICIOUS_PATTERNS:
-            if pat in resource:
-                matches.append(pat)
-            if scripts:
-                for sv in scripts.values():
-                    if pat in str(sv).lower():
-                        matches.append(pat)
-            if params:
-                for pv in params.values():
-                    if pat in str(pv).lower():
-                        matches.append(pat)
+    detectors = [
+        ("dependency-poisoning", _detect_dependency_poison),
+        ("build-tampering", _detect_build_tamper),
+        ("registry-abuse", _detect_registry_abuse),
+        ("component-substitution", _detect_component_swap),
+        ("update-hijacking", _detect_update_hijack),
+    ]
 
-        if not matches:
-            continue
+    all_events = [
+        (control_events, "control_plane.jsonl"),
+        (events, "transcripts.jsonl"),
+    ]
 
-        pkg = _extract_package(ev)
-        sev = _severity_for_attack("compromised-package", len(matches))
-        detections.append(SupplyChainDetection(
-            detection_id=_next_id(),
-            agent_id=ev.get("agent_id", "unknown"),
-            attack_type="compromised-package",
-            severity=sev,
-            confidence="high" if len(matches) >= 2 else "medium",
-            timestamp=ev.get("timestamp", ""),
-            tool=ev.get("tool", ""),
-            package=pkg,
-            description=f"Suspicious package install with malicious patterns: {', '.join(set(matches[:3]))}",
-            evidence={"matched_patterns": list(set(matches))},
-        ))
-    return detections
+    for event_list, source_file in all_events:
+        for i, ev in enumerate(event_list):
+            agent = ev.get("agent_id", "")
+            ts = ev.get("timestamp", "")
+            eid = ev.get("tool_call_id", ev.get("event_id", f"ev-{i}"))
+            target_component = ev.get("target_component", ev.get("resource", ""))
+            technique = ev.get("technique", "")
 
+            for attack_type, detector in detectors:
+                found, matches, evidence = detector(ev)
+                if found:
+                    key = (agent, eid, attack_type)
+                    if key not in seen:
+                        seen.add(key)
+                        sev = _classify_severity(attack_type, matches)
+                        patterns.append(SupplyChainPattern(
+                            timestamp=ts,
+                            agent_id=agent,
+                            event_id=eid,
+                            attack_type=attack_type,
+                            evidence=evidence,
+                            target_component=target_component,
+                            technique=technique,
+                            source_file=source_file,
+                            line=i + 1,
+                            severity=sev,
+                            matched_keywords=matches,
+                        ))
 
-def _detect_malicious_update(events: list[dict]) -> list[SupplyChainDetection]:
-    detections = []
-    pkg_versions: dict[str, list[dict]] = defaultdict(list)
-    for ev in events:
-        pkg = _extract_package(ev)
-        version = ev.get("version", "")
-        if pkg and version:
-            pkg_versions[pkg].append(ev)
+    patterns.sort(key=lambda p: ({"critical": 0, "high": 1, "medium": 2}.get(p.severity, 3), p.timestamp))
 
-    for pkg, evs in pkg_versions.items():
-        if len(evs) < 2:
-            continue
-        versions = [e.get("version", "") for e in evs]
-        for i in range(1, len(versions)):
-            prev_v = versions[i - 1]
-            curr_v = versions[i]
-            if not prev_v or not curr_v:
-                continue
-            try:
-                prev_parts = [int(x) for x in prev_v.split(".")[:3]]
-                curr_parts = [int(x) for x in curr_v.split(".")[:3]]
-            except (ValueError, IndexError):
-                continue
-            if len(prev_parts) >= 1 and len(curr_parts) >= 1:
-                if curr_parts[0] - prev_parts[0] >= 5:
-                    ev = evs[i]
-                    sev = _severity_for_attack("malicious-update", 1)
-                    detections.append(SupplyChainDetection(
-                        detection_id=_next_id(),
-                        agent_id=ev.get("agent_id", "unknown"),
-                        attack_type="malicious-update",
-                        severity=sev,
-                        confidence="medium",
-                        timestamp=ev.get("timestamp", ""),
-                        tool=ev.get("tool", ""),
-                        package=pkg,
-                        description=f"Suspicious version jump for '{pkg}': {prev_v} -> {curr_v}",
-                        evidence={"prev_version": prev_v, "curr_version": curr_v},
-                    ))
-    return detections
+    attack_chains = _build_attack_chains(patterns)
 
+    attackers = sorted({p.agent_id for p in patterns})
+    components = sorted({p.target_component for p in patterns if p.target_component})
 
-def _detect_typosquat(events: list[dict]) -> list[SupplyChainDetection]:
-    detections = []
-    seen = set()
-    for ev in events:
-        tool = ev.get("tool", "").lower()
-        if tool not in SUSPICIOUS_INSTALL_TOOLS and "install" not in tool:
-            continue
-
-        pkg = _extract_package(ev)
-        if not pkg or pkg in seen:
-            continue
-
-        target = _is_typosquat(pkg)
-        if target is None:
-            continue
-        seen.add(pkg)
-
-        sev = _severity_for_attack("typosquat", 1)
-        detections.append(SupplyChainDetection(
-            detection_id=_next_id(),
-            agent_id=ev.get("agent_id", "unknown"),
-            attack_type="typosquat",
-            severity=sev,
-            confidence="medium",
-            timestamp=ev.get("timestamp", ""),
-            tool=ev.get("tool", ""),
-            package=pkg,
-            description=f"Possible typosquat: '{pkg}' is similar to popular package '{target}'",
-            evidence={"similar_to": target, "distance": _levenshtein(pkg.lower(), target)},
-        ))
-    return detections
-
-
-def _build_agent_scores(detections: list[SupplyChainDetection]) -> list[AgentSupplyScore]:
-    by_agent: dict[str, list[SupplyChainDetection]] = defaultdict(list)
-    for d in detections:
-        by_agent[d.agent_id].append(d)
-
-    sev_weights = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-    scores = []
-    for agent_id, dets in sorted(by_agent.items()):
-        types = list({d.attack_type for d in dets})
-        pkgs = list({d.package for d in dets if d.package})
-        w = sum(sev_weights.get(d.severity, 1) for d in dets)
-        risk = min(10.0, w * (1 + 0.15 * len(types)))
-        scores.append(AgentSupplyScore(
-            agent_id=agent_id,
-            total_detections=len(dets),
-            attack_types=types,
-            risk_score=round(risk, 2),
-            packages_flagged=pkgs,
-        ))
-    scores.sort(key=lambda s: s.risk_score, reverse=True)
-    return scores
-
-
-def analyze_supply_chain(events: list[dict]) -> SupplyChainReport:
-    global _counter
-    _counter = 0
-
-    all_detections: list[SupplyChainDetection] = []
-    all_detections.extend(_detect_dependency_confusion(events))
-    all_detections.extend(_detect_compromised_package(events))
-    all_detections.extend(_detect_malicious_update(events))
-    all_detections.extend(_detect_typosquat(events))
-
-    agents = {d.agent_id for d in all_detections}
-    types_found = sorted({d.attack_type for d in all_detections})
-    pkgs = {d.package for d in all_detections if d.package}
-
-    sev_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-    highest = "low"
-    for d in all_detections:
-        if sev_order.get(d.severity, 0) > sev_order.get(highest, 0):
-            highest = d.severity
-    if not all_detections:
-        highest = "none"
-
-    summary = SupplyChainSummary(
-        total_detections=len(all_detections),
-        agents_involved=len(agents),
-        attack_types_found=types_found,
-        packages_flagged=len(pkgs),
-        highest_severity=highest,
-    )
+    by_type: dict[str, int] = defaultdict(int)
+    crit = high = med = 0
+    for p in patterns:
+        by_type[p.attack_type] += 1
+        if p.severity == "critical":
+            crit += 1
+        elif p.severity == "high":
+            high += 1
+        else:
+            med += 1
 
     return SupplyChainReport(
-        detections=all_detections,
-        summary=summary,
-        agent_scores=_build_agent_scores(all_detections),
+        patterns=patterns,
+        summary=SupplyChainSummary(
+            total_patterns=len(patterns),
+            by_type=dict(by_type),
+            agents_attacking=len(attackers),
+            critical_count=crit,
+            high_count=high,
+            medium_count=med,
+            components_targeted=len(components),
+        ),
+        agents_involved=attackers,
+        attack_chains=attack_chains,
     )
+
+
+def _build_attack_chains(patterns: list[SupplyChainPattern]) -> list[dict[str, Any]]:
+    by_agent: dict[str, list[SupplyChainPattern]] = defaultdict(list)
+    for p in patterns:
+        by_agent[p.agent_id].append(p)
+
+    chains: list[dict[str, Any]] = []
+    for agent, agent_patterns in sorted(by_agent.items()):
+        if len(agent_patterns) < 2:
+            continue
+        types_used = sorted({p.attack_type for p in agent_patterns})
+        targets = sorted({p.target_component for p in agent_patterns if p.target_component})
+        chains.append({
+            "agent_id": agent,
+            "attack_types": types_used,
+            "pattern_count": len(agent_patterns),
+            "targets": targets,
+            "timeline": [
+                {"timestamp": p.timestamp, "type": p.attack_type, "target": p.target_component}
+                for p in agent_patterns
+            ],
+        })
+    return chains
 
 
 def format_text(report: SupplyChainReport) -> str:
-    lines = ["=== Supply Chain Attack Detection Report ===", ""]
-    s = report.summary
-    lines.append(f"Total detections:  {s.total_detections}")
-    lines.append(f"Agents involved:   {s.agents_involved}")
-    lines.append(f"Attack types:      {', '.join(s.attack_types_found) if s.attack_types_found else 'none'}")
-    lines.append(f"Packages flagged:  {s.packages_flagged}")
-    lines.append(f"Highest severity:  {s.highest_severity}")
+    lines: list[str] = []
+    lines.append("Supply Chain Attack Detection")
+    lines.append("=" * 62)
     lines.append("")
 
-    if report.detections:
-        lines.append("--- Detections ---")
-        for d in report.detections:
-            lines.append(f"  [{d.detection_id}] {d.attack_type} | {d.severity} | {d.confidence} confidence")
-            lines.append(f"    Agent: {d.agent_id}  Tool: {d.tool}  Package: {d.package}")
-            lines.append(f"    {d.description}")
-            lines.append(f"    Time: {d.timestamp}")
-            lines.append("")
+    s = report.summary
+    lines.append(f"  Total patterns:         {s.total_patterns}")
+    lines.append(f"  Agents attacking:       {s.agents_attacking}")
+    lines.append(f"  Components targeted:    {s.components_targeted}")
+    lines.append(f"  Critical:               {s.critical_count}")
+    lines.append(f"  High:                   {s.high_count}")
+    lines.append(f"  Medium:                 {s.medium_count}")
+    lines.append("")
 
-    if report.agent_scores:
-        lines.append("--- Agent Scores ---")
-        for a in report.agent_scores:
-            lines.append(f"  {a.agent_id}: risk={a.risk_score}  detections={a.total_detections}  "
-                         f"types={', '.join(a.attack_types)}  pkgs={', '.join(a.packages_flagged[:3])}")
+    if s.by_type:
+        lines.append("  By Type:")
+        for t, count in sorted(s.by_type.items()):
+            lines.append(f"    {t}: {count}")
         lines.append("")
 
-    return "\n".join(lines)
+    if report.patterns:
+        lines.append("  Detected Patterns:")
+        lines.append("  " + "-" * 60)
+        for p in report.patterns:
+            sev_tag = p.severity.upper()
+            lines.append(f"  [{sev_tag}] {p.attack_type}: {p.agent_id}")
+            lines.append(f"    {p.evidence}")
+            if p.target_component:
+                lines.append(f"    Component: {p.target_component}")
+            if p.technique:
+                lines.append(f"    Technique: {p.technique}")
+            lines.append(f"    Time: {p.timestamp}  Source: {p.source_file}:{p.line}")
+            lines.append("")
+
+    if report.attack_chains:
+        lines.append("  Attack Chains:")
+        lines.append("  " + "-" * 60)
+        for chain in report.attack_chains:
+            lines.append(f"    {chain['agent_id']}: {chain['pattern_count']} patterns using {', '.join(chain['attack_types'])}")
+            if chain["targets"]:
+                lines.append(f"      Targets: {', '.join(chain['targets'])}")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
 
 
 def format_json(report: SupplyChainReport) -> str:
     data = {
-        "detections": [asdict(d) for d in report.detections],
+        "patterns": [asdict(p) for p in report.patterns],
         "summary": asdict(report.summary),
-        "agent_scores": [asdict(a) for a in report.agent_scores],
+        "agents_involved": report.agents_involved,
+        "attack_chains": report.attack_chains,
     }
-    return json.dumps(data, indent=2)
-
-
-def _load_events(path: str | Path) -> list[dict]:
-    p = Path(path)
-    if p.is_dir():
-        events = []
-        for f in sorted(p.glob("*.json")):
-            events.extend(json.loads(f.read_text()))
-        return events
-    return json.loads(p.read_text())
+    return json.dumps(data, indent=2, sort_keys=False) + "\n"
