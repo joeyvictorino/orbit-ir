@@ -123,6 +123,7 @@ from .prompt_inject import analyze_prompt_inject, format_text as format_promptin
 from .impact_chain import analyze_impact_chains, format_text as format_ic_text, format_json as format_ic_json, _load_events as _load_ic_events
 from .session_link import analyze_session_links, format_text as format_sl_text, format_json as format_sl_json, _load_events as _load_sl_events
 from .anomaly_score import score_anomalies, format_text as format_as_text, format_json as format_as_json, _load_events as _load_as_events
+from .trust_boundary import analyze_trust_boundaries, format_text as format_tb_text, format_json as format_tb_json, _load_events as _load_tb_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -844,6 +845,11 @@ def build_parser() -> argparse.ArgumentParser:
     as_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     as_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     as_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    tb_p = subparsers.add_parser("trust-boundary", help="Detect trust boundary crossings between zones and privilege levels")
+    tb_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    tb_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    tb_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2351,6 +2357,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Anomaly score report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "trust-boundary":
+        evidence_events = _load_tb_events(args.evidence_dir)
+        report = analyze_trust_boundaries(evidence_events)
+        if args.format == "json":
+            output = format_tb_json(report)
+        else:
+            output = format_tb_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Trust boundary report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
