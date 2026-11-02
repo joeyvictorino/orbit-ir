@@ -25,6 +25,8 @@ class LabTest(unittest.TestCase):
                 participants=24,
                 spoofed_tool_calls=7,
                 coordinators=3,
+                unbacked_completions=5,
+                oracle_modifications=3,
                 seed=17,
             )
             truth = generate_dataset(root / "evidence", config)
@@ -50,10 +52,17 @@ class LabTest(unittest.TestCase):
             self.assertEqual(first_finding["transcript_source"], "transcripts.jsonl")
             self.assertEqual(first_finding["control_source"], "control_plane.jsonl")
 
+            self.assertEqual(summary["findings"]["unbacked_completions"], 5)
+            self.assertEqual(summary["findings"]["oracle_integrity_violations"], 3)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_positive"], 0)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_negative"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_positive"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_negative"], 0)
+
     def test_generation_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            config = LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, seed=9)
+            config = LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9)
             generate_dataset(root / "one", config)
             generate_dataset(root / "two", config)
             for filename in ("messages.jsonl", "transcripts.jsonl", "control_plane.jsonl", "ground_truth.json"):
@@ -64,7 +73,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             (root / "evidence" / "ground_truth.json").unlink()
             summary = analyze_dataset(root / "evidence", root / "results")
@@ -77,7 +86,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             transcript_path = root / "evidence" / "transcripts.jsonl"
             rows = transcript_path.read_text(encoding="utf-8").splitlines()
@@ -96,7 +105,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             control_path = root / "evidence" / "control_plane.jsonl"
             controls = [json.loads(row) for row in control_path.read_text(encoding="utf-8").splitlines()]
@@ -117,7 +126,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             transcript_path = root / "evidence" / "transcripts.jsonl"
             rows = transcript_path.read_text(encoding="utf-8").splitlines()
@@ -129,12 +138,53 @@ class LabTest(unittest.TestCase):
             self.assertIn("duplicate-transcript-tool-call-id", text)
             self.assertIn("1;31", text)
 
+    def test_unbacked_completions_detected_without_tool_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=4, oracle_modifications=0, seed=42,
+            )
+            truth = generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertEqual(summary["findings"]["unbacked_completions"], 4)
+            self.assertEqual(summary["findings"]["transcript_tool_call_mismatches"], 0)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["true_positive"], 4)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_positive"], 0)
+            text = (root / "results" / "findings.csv").read_text(encoding="utf-8")
+            self.assertIn("unbacked-completion", text)
+            self.assertNotIn("tool-name-mismatch", text)
+
+    def test_oracle_modifications_detected_by_resource_and_effect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=3, seed=42,
+            )
+            truth = generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertEqual(summary["findings"]["oracle_integrity_violations"], 3)
+            self.assertEqual(summary["findings"]["transcript_tool_call_mismatches"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["true_positive"], 3)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_positive"], 0)
+            text = (root / "results" / "findings.csv").read_text(encoding="utf-8")
+            self.assertIn("oracle-integrity-violation", text)
+
     def test_malformed_json_reports_the_exact_source_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             message_path = root / "evidence" / "messages.jsonl"
             rows = message_path.read_text(encoding="utf-8").splitlines()
@@ -155,7 +205,7 @@ class LabTest(unittest.TestCase):
     def test_cli_reports_malformed_evidence_without_a_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            generate_dataset(root / "evidence", LabConfig(agents=20, messages=100, transcripts=30, participants=10, spoofed_tool_calls=3, coordinators=2, seed=5))
+            generate_dataset(root / "evidence", LabConfig(agents=20, messages=100, transcripts=30, participants=10, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=5))
             message_path = root / "evidence" / "messages.jsonl"
             rows = message_path.read_text(encoding="utf-8").splitlines()
             message_path.write_text("{not-json}\n" + "\n".join(rows[1:]) + "\n", encoding="utf-8")

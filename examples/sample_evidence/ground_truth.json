@@ -3,15 +3,22 @@
     "agents": 40,
     "coordinators": 3,
     "messages": 500,
+    "oracle_modifications": 3,
     "participants": 24,
     "seed": 17,
     "spoofed_tool_calls": 7,
-    "transcripts": 80
+    "transcripts": 80,
+    "unbacked_completions": 5
   },
   "coordinators": [
     "agent-0009",
     "agent-0024",
     "agent-0030"
+  ],
+  "oracle_modification_tool_call_ids": [
+    "tool-000066",
+    "tool-000074",
+    "tool-000075"
   ],
   "participating_agents": [
     "agent-0000",
@@ -49,5 +56,12 @@
     "tool-000076",
     "tool-000079"
   ],
-  "synthetic": true
+  "synthetic": true,
+  "unbacked_completion_tool_call_ids": [
+    "tool-000002",
+    "tool-000006",
+    "tool-000047",
+    "tool-000049",
+    "tool-000058"
+  ]
 }

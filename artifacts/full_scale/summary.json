@@ -16,6 +16,13 @@
       "true_positive": 6
     },
     "interpretation": "The evaluation fixture was consulted only after detections were complete. Scores measure recovery on generated data, not expected production accuracy.",
+    "oracle_modification_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 12
+    },
     "participant_detection": {
       "false_negative": 0,
       "false_positive": 0,
@@ -29,6 +36,13 @@
       "precision": 1.0,
       "recall": 1.0,
       "true_positive": 84
+    },
+    "unbacked_completion_detection": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positive": 30
     }
   },
   "findings": {
@@ -39,11 +53,14 @@
     "identity_or_trace_conflicts": 0,
     "missing_control_plane_events": 0,
     "missing_transcripts": 0,
+    "oracle_integrity_violations": 12,
     "reason_counts": {
       "argument-digest-mismatch": 84,
-      "tool-name-mismatch": 84
+      "oracle-integrity-violation": 12,
+      "tool-name-mismatch": 84,
+      "unbacked-completion": 30
     },
-    "record_conflicts": 84,
+    "record_conflicts": 126,
     "top_coordinators": [
       "agent-0058",
       "agent-1097",
@@ -52,8 +69,9 @@
       "agent-0475",
       "agent-0339"
     ],
-    "trajectory_records": 84,
+    "trajectory_records": 126,
     "transcript_tool_call_mismatches": 84,
+    "unbacked_completions": 30,
     "unsanctioned_board_messages": 57400
   },
   "limitations": [
@@ -77,7 +95,7 @@
     "llm_boundary": "No LLM is used for factual extraction, joins, integrity checks, or findings. An LLM may summarize already-cited findings only.",
     "untrusted_source": "transcripts.jsonl"
   },
-  "runtime_seconds": 0.727,
+  "runtime_seconds": 0.464,
   "scenario": "Synthetic cross-agent coordination and transcript/control-plane inconsistency exercise",
   "synthetic": true
 }
