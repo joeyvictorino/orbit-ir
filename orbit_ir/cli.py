@@ -5,8 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-from .analyzer import analyze_dataset
+from .analyzer import analyze_dataset, verify_evidence
 from .generator import LabConfig, generate_dataset
+from .validate import validate_evidence
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,6 +40,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0",
     )
 
+    verify = subparsers.add_parser("verify", help="Verify evidence integrity against a manifest")
+    verify.add_argument("--input", type=Path, required=True, help="Evidence directory to verify")
+    verify.add_argument(
+        "--manifest",
+        type=Path,
+        help="Manifest JSON to verify against (default: <input>/../results/evidence_manifest.json or recompute)",
+    )
+
+    validate = subparsers.add_parser("validate", help="Validate evidence format and cross-file integrity")
+    validate.add_argument("--input", type=Path, required=True, help="Evidence directory to validate")
+    validate.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -68,6 +81,28 @@ def _run(args: argparse.Namespace) -> None:
         )
         truth = generate_dataset(args.out, config)
         print(json.dumps({"status": "generated", "config": truth["config"]}, sort_keys=True))
+    elif args.command == "verify":
+        result = verify_evidence(args.input, manifest_path=args.manifest)
+        ok = all(f["status"] == "ok" for f in result["files"])
+        for f in result["files"]:
+            mark = "OK" if f["status"] == "ok" else "FAIL"
+            print(f"  [{mark}] {f['name']}: {f['detail']}")
+        if ok:
+            print(f"\nAll {len(result['files'])} evidence files verified.")
+        else:
+            failed = sum(1 for f in result["files"] if f["status"] != "ok")
+            print(f"\n{failed} of {len(result['files'])} files failed verification.")
+            raise SystemExit(1)
+        return
+    elif args.command == "validate":
+        report = validate_evidence(args.input)
+        if args.format == "json":
+            print(json.dumps(report, sort_keys=True, indent=2))
+        else:
+            _print_validation(report)
+        if not report["valid"]:
+            raise SystemExit(1)
+        return
     elif args.command == "analyze":
         summary = analyze_dataset(
             args.input,
@@ -90,6 +125,32 @@ def _run(args: argparse.Namespace) -> None:
             ground_truth_path=data_dir / "ground_truth.json",
         )
         print(json.dumps(summary, sort_keys=True))
+
+
+def _print_validation(report: dict) -> None:
+    for fname, fr in report["files"].items():
+        status = "OK" if not fr["errors"] else "FAIL"
+        print(f"  [{status}] {fname}: {fr['records']} records")
+        for e in fr["errors"]:
+            print(f"    ERROR: {e}")
+        for w in fr["warnings"]:
+            print(f"    WARN:  {w}")
+
+    integrity = report.get("integrity", {})
+    if integrity.get("checks"):
+        print("\n  Integrity checks:")
+        for check in integrity["checks"]:
+            name = check.pop("name", "?")
+            detail = ", ".join(f"{k}={v}" for k, v in check.items())
+            print(f"    {name}: {detail}")
+    for e in integrity.get("errors", []):
+        print(f"    ERROR: {e}")
+    for w in integrity.get("warnings", []):
+        print(f"    WARN:  {w}")
+
+    s = report["summary"]
+    print(f"\n  {s['total_records']} records, {s['total_errors']} errors, {s['total_warnings']} warnings")
+    print(f"  Valid: {report['valid']}")
 
 
 if __name__ == "__main__":
