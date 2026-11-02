@@ -101,6 +101,8 @@ from .evidence_quality import analyze as analyze_evidence_quality, format_text a
 from .response_effectiveness import analyze as analyze_response_effectiveness, format_text as format_re_text, format_json as format_re_json
 from .coordination import analyze as analyze_coordination, format_text as format_coord_text, format_json as format_coord_json
 from .evidence_gaps import analyze as analyze_evidence_gaps, format_text as format_gaps_text, format_json as format_gaps_json
+from .tactic_chain import analyze_tactic_chains, format_text as format_tc_text, format_json as format_tc_json, _load_events as _load_tc_events
+from .resource_map import analyze_resource_map, format_text as format_rm_text, format_json as format_rm_json, _load_events as _load_rm_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -710,6 +712,18 @@ def build_parser() -> argparse.ArgumentParser:
     gaps_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     gaps_p.add_argument("--threshold", type=float, default=300.0, help="Gap threshold in seconds (default: 300)")
     gaps_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    tc_p = subparsers.add_parser("tactic-chain", help="Detect MITRE ATT&CK tactic progression chains in agent behavior")
+    tc_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    tc_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    tc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rm_p = subparsers.add_parser("resource-map", help="Build resource access topology and detect concentration/contention")
+    rm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    rm_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    rm_p.add_argument("--concentration-threshold", type=int, default=5, help="Min unique resources for concentration alert (default: 5)")
+    rm_p.add_argument("--contention-threshold", type=int, default=2, help="Min agents for contention alert (default: 2)")
+    rm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1905,6 +1919,38 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Evidence gaps report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "tactic-chain":
+        evidence_events = _load_tc_events(args.evidence_dir)
+        report = analyze_tactic_chains(evidence_events)
+        if args.format == "json":
+            output = format_tc_json(report)
+        else:
+            output = format_tc_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Tactic chain report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "resource-map":
+        evidence_events = _load_rm_events(args.evidence_dir)
+        report = analyze_resource_map(
+            evidence_events,
+            concentration_threshold=args.concentration_threshold,
+            contention_threshold=args.contention_threshold,
+        )
+        if args.format == "json":
+            output = format_rm_json(report)
+        else:
+            output = format_rm_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Resource map report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
