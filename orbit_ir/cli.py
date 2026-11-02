@@ -59,6 +59,8 @@ from .window import window_analysis, format_window_text
 from .detect import detect_anomalies, format_detect_text as format_detect_output
 from .classify import classify_events, format_classify_text
 from .baseline import create_baseline, compare_baseline, format_baseline_text
+from .correlate_agents import correlate_agents_analysis, format_correlate_agents_text
+from .sentiment import analyze_sentiment, format_sentiment_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -414,6 +416,15 @@ def build_parser() -> argparse.ArgumentParser:
     bl.add_argument("--compare", type=Path, default=None, help="Path to baseline JSON to compare against")
     bl.add_argument("--drift-threshold", type=float, default=0.1, help="Minimum drift to report (default: 0.1)")
     bl.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    ca = subparsers.add_parser("correlate-agents", help="Cross-agent behavioral correlation analysis")
+    ca.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    ca.add_argument("--min-similarity", type=float, default=0.3, help="Minimum Jaccard similarity (default: 0.3)")
+    ca.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    sent = subparsers.add_parser("sentiment", help="Analyze event tone and intent markers")
+    sent.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    sent.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -852,6 +863,22 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_detect_output(result), end="")
+        return
+    elif args.command == "correlate-agents":
+        result = correlate_agents_analysis(
+            args.input, min_similarity=args.min_similarity,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_correlate_agents_text(result), end="")
+        return
+    elif args.command == "sentiment":
+        result = analyze_sentiment(args.input)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_sentiment_text(result), end="")
         return
     elif args.command == "classify":
         result = classify_events(args.input, threshold=args.threshold)
