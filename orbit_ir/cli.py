@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .analyzer import analyze_dataset, verify_evidence
+from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .validate import validate_evidence
 
@@ -51,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="Validate evidence format and cross-file integrity")
     validate.add_argument("--input", type=Path, required=True, help="Evidence directory to validate")
     validate.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    diff = subparsers.add_parser("diff", help="Compare two analysis results directories")
+    diff.add_argument("--before", type=Path, required=True, help="Earlier results directory")
+    diff.add_argument("--after", type=Path, required=True, help="Later results directory")
+    diff.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -102,6 +108,13 @@ def _run(args: argparse.Namespace) -> None:
             _print_validation(report)
         if not report["valid"]:
             raise SystemExit(1)
+        return
+    elif args.command == "diff":
+        result = diff_results(args.before, args.after)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_diff_text(result))
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
