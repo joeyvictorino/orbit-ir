@@ -1216,6 +1216,11 @@ def build_parser() -> argparse.ArgumentParser:
     ri_p.add_argument("--format", choices=["text", "json"], default="text")
     ri_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
+    pd_p = subparsers.add_parser("privilege-delegation", help="Detect privilege delegation patterns between agents")
+    pd_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    pd_p.add_argument("--format", choices=["text", "json"], default="text")
+    pd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -3538,6 +3543,26 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Role impersonation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "privilege-delegation":
+        from orbit_ir.privilege_delegation import (
+            analyze_privilege_delegation,
+            format_json as format_pd_json,
+            format_text as format_pd_text,
+        )
+        from orbit_ir.privilege_delegation import _load_events as _load_pd_events
+        events = _load_pd_events(str(args.evidence_dir))
+        report = analyze_privilege_delegation(events)
+        if args.format == "json":
+            output = format_pd_json(report)
+        else:
+            output = format_pd_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Privilege delegation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
