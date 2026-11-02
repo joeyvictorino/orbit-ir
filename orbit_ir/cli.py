@@ -125,6 +125,7 @@ from .session_link import analyze_session_links, format_text as format_sl_text, 
 from .anomaly_score import score_anomalies, format_text as format_as_text, format_json as format_as_json, _load_events as _load_as_events
 from .trust_boundary import analyze_trust_boundaries, format_text as format_tb_text, format_json as format_tb_json, _load_events as _load_tb_events
 from .threat_model import analyze as analyze_threat_model, format_text as format_tm_text, format_json as format_tm_json
+from .capability_map import analyze_capability_map, format_text as format_cm_text, format_json as format_cm_json, _load_events as _load_cm_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -851,6 +852,11 @@ def build_parser() -> argparse.ArgumentParser:
     tb_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     tb_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     tb_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cm_p = subparsers.add_parser("capability-map", help="Map agent capabilities from observed tool and resource usage")
+    cm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cm_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     tm_p = subparsers.add_parser("threat-model", help="Build STRIDE threat model from agent incident evidence")
     tm_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
@@ -2377,6 +2383,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Trust boundary report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "capability-map":
+        events = _load_cm_events(str(args.evidence_dir))
+        report = analyze_capability_map(events)
+        if args.format == "json":
+            output = format_cm_json(report)
+        else:
+            output = format_cm_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Capability map written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
