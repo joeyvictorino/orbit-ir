@@ -161,6 +161,8 @@ from .resource_hijack import analyze as analyze_resource_hijack, format_text as 
 from .data_poisoning import analyze as analyze_data_poisoning, format_text as format_dp_text, format_json as format_dp_json, _load_events as _load_dp_events
 from .model_extraction import analyze as analyze_model_extraction, format_text as format_me_text, format_json as format_me_json, _load_events as _load_me_events
 from .denial_of_service import analyze as analyze_dos, format_text as format_dos_text, format_json as format_dos_json, _load_events as _load_dos_events
+from .network_scan import analyze_network_scans, format_text as format_netscan_text, format_json as format_netscan_json, _load_events as _load_netscan_events
+from .anti_forensics import analyze_anti_forensics, format_text as format_antifor_text, format_json as format_antifor_json, _load_events as _load_antifor_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1095,6 +1097,16 @@ def build_parser() -> argparse.ArgumentParser:
     dos_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     dos_p.add_argument("--format", choices=["text", "json"], default="text")
     dos_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    netscan_p = subparsers.add_parser("network-scan", help="Detect network scanning patterns")
+    netscan_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    netscan_p.add_argument("--format", choices=["text", "json"], default="text")
+    netscan_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    antifor_p = subparsers.add_parser("anti-forensics", help="Detect anti-forensics techniques")
+    antifor_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    antifor_p.add_argument("--format", choices=["text", "json"], default="text")
+    antifor_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3142,6 +3154,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Denial of service analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "network-scan":
+        events = _load_netscan_events(str(args.evidence_dir))
+        report = analyze_network_scans(events)
+        if args.format == "json":
+            output = format_netscan_json(report)
+        else:
+            output = format_netscan_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Network scan analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "anti-forensics":
+        events = _load_antifor_events(str(args.evidence_dir))
+        report = analyze_anti_forensics(events)
+        if args.format == "json":
+            output = format_antifor_json(report)
+        else:
+            output = format_antifor_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Anti-forensics analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
