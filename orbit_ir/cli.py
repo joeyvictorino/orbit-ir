@@ -159,6 +159,8 @@ from .social_engineering import analyze as analyze_social_eng, format_text as fo
 from .timing_attack import analyze as analyze_timing_attack, format_text as format_ta_text, format_json as format_ta_json, _load_events as _load_ta_events
 from .resource_hijack import analyze as analyze_resource_hijack, format_text as format_rh_text, format_json as format_rh_json, _load_events as _load_rh_events
 from .data_poisoning import analyze as analyze_data_poisoning, format_text as format_dp_text, format_json as format_dp_json, _load_events as _load_dp_events
+from .model_extraction import analyze as analyze_model_extraction, format_text as format_me_text, format_json as format_me_json, _load_events as _load_me_events
+from .denial_of_service import analyze as analyze_dos, format_text as format_dos_text, format_json as format_dos_json, _load_events as _load_dos_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1083,6 +1085,16 @@ def build_parser() -> argparse.ArgumentParser:
     dp_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     dp_p.add_argument("--format", choices=["text", "json"], default="text")
     dp_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    me_p = subparsers.add_parser("model-extraction", help="Detect model extraction/stealing attempts")
+    me_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    me_p.add_argument("--format", choices=["text", "json"], default="text")
+    me_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dos_p = subparsers.add_parser("denial-of-service", help="Detect denial of service patterns")
+    dos_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    dos_p.add_argument("--format", choices=["text", "json"], default="text")
+    dos_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3102,6 +3114,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Data poisoning analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "model-extraction":
+        events = _load_me_events(str(args.evidence_dir))
+        report = analyze_model_extraction(events)
+        if args.format == "json":
+            output = format_me_json(report)
+        else:
+            output = format_me_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Model extraction analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "denial-of-service":
+        events = _load_dos_events(str(args.evidence_dir))
+        report = analyze_dos(events)
+        if args.format == "json":
+            output = format_dos_json(report)
+        else:
+            output = format_dos_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Denial of service analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
