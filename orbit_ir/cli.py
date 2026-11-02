@@ -69,6 +69,8 @@ from .topology import load_and_build as load_topology, format_topology_text, for
 from .timeline_compare import load_and_compare, format_compare_text
 from .mitre_report import generate_mitre_report, format_mitre_report_text
 from .evidence_chain import build_evidence_chains, format_evidence_chain_text
+from .frequency import build_frequency as build_freq, format_frequency_text, load_and_build as load_frequency
+from .outlier import detect_outliers, format_outlier_text, load_and_detect as load_outliers
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -478,6 +480,17 @@ def build_parser() -> argparse.ArgumentParser:
     ec.add_argument("--min-chain-length", type=int, default=2, help="Minimum events in a chain (default: 2)")
     ec.add_argument("--max-chains", type=int, default=20, help="Maximum chains to show (default: 20)")
     ec.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    freq_p = subparsers.add_parser("frequency", help="Event frequency analysis across agents and types")
+    freq_p.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    freq_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    freq_p.add_argument("--out", type=Path, default=None, help="Write output to file")
+
+    out_p = subparsers.add_parser("outlier", help="Statistical outlier detection for event patterns")
+    out_p.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    out_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    out_p.add_argument("--z-threshold", type=float, default=2.0, help="Z-score threshold (default: 2.0)")
+    out_p.add_argument("--out", type=Path, default=None, help="Write output to file")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1145,6 +1158,33 @@ def _run(args: argparse.Namespace) -> None:
         else:
             print(output, end="")
         return
+
+    elif args.command == "frequency":
+        result = load_frequency(args.input)
+        if args.format == "json":
+            output = json.dumps(result, sort_keys=True, indent=2)
+        else:
+            output = format_frequency_text(result)
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(output, encoding="utf-8")
+        else:
+            print(output, end="")
+        return
+
+    elif args.command == "outlier":
+        result = load_outliers(args.input, z_threshold=args.z_threshold)
+        if args.format == "json":
+            output = json.dumps(result, sort_keys=True, indent=2)
+        else:
+            output = format_outlier_text(result)
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(output, encoding="utf-8")
+        else:
+            print(output, end="")
+        return
+
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"
