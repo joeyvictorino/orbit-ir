@@ -47,6 +47,8 @@ from .report_gen import generate_report, ReportConfig
 from .chain import parse_chain, run_chain, format_chain_text
 from .sample import sample_evidence, format_sample_text
 from .anonymize import anonymize_evidence, format_anonymize_text
+from .inspect import list_events, inspect_event, format_inspect_text
+from .redact import redact_evidence, format_redact_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -323,6 +325,19 @@ def build_parser() -> argparse.ArgumentParser:
     anon.add_argument("--salt", default="orbit-ir", help="Salt for pseudonym generation")
     anon.add_argument("--save-mapping", action="store_true", help="Save original->pseudonym mapping to file")
     anon.add_argument("--format", choices=["text", "json"], default="text")
+
+    insp = subparsers.add_parser("inspect", help="Deep analysis of individual evidence events with context")
+    insp.add_argument("--input", type=Path, required=True, help="Evidence file or directory")
+    insp.add_argument("--index", type=int, default=None, help="Event index to inspect")
+    insp.add_argument("--event-id", default=None, help="Event ID to inspect")
+    insp.add_argument("--context", type=int, default=3, help="Number of surrounding events")
+    insp.add_argument("--format", choices=["text", "json"], default="text")
+
+    rdc = subparsers.add_parser("redact", help="Scrub PII from evidence with typed placeholders")
+    rdc.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    rdc.add_argument("--output", type=Path, required=True, help="Output directory for redacted evidence")
+    rdc.add_argument("--pattern-file", type=Path, default=None, help="Custom patterns file (NAME: regex per line)")
+    rdc.add_argument("--format", choices=["text", "json"], default="text")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -657,6 +672,28 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_anonymize_text(result), end="")
+        return
+    elif args.command == "inspect":
+        if args.event_id is not None or args.index is not None:
+            result = inspect_event(
+                args.input, index=args.index, event_id=args.event_id,
+                context=args.context,
+            )
+        else:
+            result = list_events(args.input)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2, default=str))
+        else:
+            print(format_inspect_text(result), end="")
+        return
+    elif args.command == "redact":
+        result = redact_evidence(
+            args.input, args.output, pattern_file=args.pattern_file,
+        )
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_redact_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
