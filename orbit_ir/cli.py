@@ -77,6 +77,8 @@ from .playbook import generate_playbook, format_playbook_text
 from .risk_score import compute_risk_score, format_risk_score_text
 from .timeline_export import export_timeline, TimelineExporter
 from .agent_profile import profile_evidence_agents, format_agent_profile_text
+from .compliance_map import map_compliance, format_compliance_map_text
+from .evidence_score import score_evidence, format_evidence_score_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -534,6 +536,17 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--agent", default=None, help="Filter to specific agent")
     ap.add_argument("--min-risk", type=float, default=0.0, help="Minimum risk score to show (default: 0)")
     ap.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cm = subparsers.add_parser("compliance-map", help="Map findings to compliance frameworks (NIST, SOC2, ISO 27001)")
+    cm.add_argument("--input", type=Path, required=True, help="Analysis results JSON file")
+    cm.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cm.add_argument("--framework", action="append", default=None, help="Framework(s) to map (default: all); repeat for multiple")
+    cm.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    es = subparsers.add_parser("evidence-score", help="Score evidence quality and completeness")
+    es.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    es.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    es.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1312,6 +1325,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Agent profiles written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "compliance-map":
+        result = map_compliance(args.input, frameworks=args.framework)
+        data = result.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_compliance_map_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Compliance map written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "evidence-score":
+        result = score_evidence(args.input)
+        data = result.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_evidence_score_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Evidence score written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
