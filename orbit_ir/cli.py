@@ -105,6 +105,8 @@ from .tactic_chain import analyze_tactic_chains, format_text as format_tc_text, 
 from .resource_map import analyze_resource_map, format_text as format_rm_text, format_json as format_rm_json, _load_events as _load_rm_events
 from .exfil_detect import analyze_exfiltration, format_text as format_exfil_text, format_json as format_exfil_json, _load_events as _load_exfil_events
 from .c2_detect import analyze_c2, format_text as format_c2_text, format_json as format_c2_json, _load_events as _load_c2_events
+from .persistence_detect import analyze_persistence, format_text as format_persist_text, format_json as format_persist_json, _load_events as _load_persist_events
+from .defense_evasion import analyze_defense_evasion, format_text as format_evasion_text, format_json as format_evasion_json, _load_events as _load_evasion_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -736,6 +738,16 @@ def build_parser() -> argparse.ArgumentParser:
     c2_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     c2_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     c2_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    persist_p = subparsers.add_parser("persistence-detect", help="Detect persistence mechanism establishment patterns")
+    persist_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    persist_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    persist_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    evasion_p = subparsers.add_parser("defense-evasion", help="Detect defense evasion techniques mapped to MITRE ATT&CK")
+    evasion_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    evasion_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    evasion_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1991,6 +2003,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"C2 detection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "persistence-detect":
+        evidence_events = _load_persist_events(args.evidence_dir)
+        report = analyze_persistence(evidence_events)
+        if args.format == "json":
+            output = format_persist_json(report)
+        else:
+            output = format_persist_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Persistence detection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "defense-evasion":
+        evidence_events = _load_evasion_events(args.evidence_dir)
+        report = analyze_defense_evasion(evidence_events)
+        if args.format == "json":
+            output = format_evasion_json(report)
+        else:
+            output = format_evasion_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Defense evasion report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
