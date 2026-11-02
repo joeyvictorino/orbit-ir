@@ -32,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional synthetic evaluation fixture; never used to determine findings",
     )
     analyze.add_argument("--coordinator-min-assignments", type=int, default=2)
+    analyze.add_argument(
+        "--format",
+        choices=["json", "sarif"],
+        default="json",
+        help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0",
+    )
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -69,7 +75,11 @@ def _run(args: argparse.Namespace) -> None:
             ground_truth_path=args.ground_truth,
             coordinator_min_assignments=args.coordinator_min_assignments,
         )
-        print(json.dumps(summary, sort_keys=True))
+        if args.format == "sarif":
+            sarif_path = args.out / "findings.sarif"
+            print(sarif_path.read_text(encoding="utf-8"), end="")
+        else:
+            print(json.dumps(summary, sort_keys=True))
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"

@@ -536,6 +536,75 @@ class LabTest(unittest.TestCase):
                     self.assertLessEqual(score, 1.0)
 
 
+    def test_sarif_output_is_valid_and_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir)
+
+            sarif_path = results_dir / "findings.sarif"
+            self.assertTrue(sarif_path.exists())
+
+            sarif = json.loads(sarif_path.read_text())
+            self.assertEqual(sarif["version"], "2.1.0")
+            self.assertIn("$schema", sarif)
+            self.assertEqual(len(sarif["runs"]), 1)
+
+            run = sarif["runs"][0]
+            self.assertEqual(run["tool"]["driver"]["name"], "orbit-ir")
+            self.assertIn("rules", run["tool"]["driver"])
+            self.assertGreater(len(run["results"]), 0)
+
+            for result in run["results"]:
+                self.assertIn("ruleId", result)
+                self.assertIn("level", result)
+                self.assertIn(result["level"], {"error", "warning", "note"})
+                self.assertIn("message", result)
+                self.assertIn("locations", result)
+                loc = result["locations"][0]["physicalLocation"]
+                self.assertIn("artifactLocation", loc)
+                self.assertIn("region", loc)
+                self.assertGreaterEqual(loc["region"]["startLine"], 1)
+
+    def test_sarif_cli_format_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                cli.main.__wrapped__ if hasattr(cli.main, "__wrapped__") else None
+                import sys
+                old_argv = sys.argv
+                sys.argv = [
+                    "orbit-ir", "analyze",
+                    "--input", str(evidence_dir),
+                    "--out", str(results_dir),
+                    "--format", "sarif",
+                ]
+                try:
+                    cli._run(cli.build_parser().parse_args())
+                finally:
+                    sys.argv = old_argv
+
+            output = stdout.getvalue()
+            sarif = json.loads(output)
+            self.assertEqual(sarif["version"], "2.1.0")
+            self.assertGreater(len(sarif["runs"][0]["results"]), 0)
+
     def test_lateral_movement_detected_with_resource_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

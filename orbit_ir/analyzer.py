@@ -611,6 +611,15 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
+    from .sarif import write_sarif
+
+    write_sarif(
+        findings,
+        output_dir / "findings.sarif",
+        lateral_movement=lateral_movement,
+        input_dir=input_dir,
+    )
+
     report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters, lateral_movement)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
