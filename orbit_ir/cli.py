@@ -18,6 +18,7 @@ from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
 from .validate import validate_evidence
+from .merge import merge_evidence
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -107,6 +108,10 @@ def build_parser() -> argparse.ArgumentParser:
     stats.add_argument("--input", type=Path, required=True, help="Evidence directory")
     stats.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    merge = subparsers.add_parser("merge", help="Merge multiple evidence directories into one")
+    merge.add_argument("--inputs", type=Path, nargs="+", required=True, help="Evidence directories to merge")
+    merge.add_argument("--out", type=Path, required=True, help="Output directory for merged evidence")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -174,6 +179,10 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_diff_text(result))
+        return
+    elif args.command == "merge":
+        result = merge_evidence(args.inputs, args.out)
+        print(json.dumps(result, sort_keys=True, indent=2))
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
