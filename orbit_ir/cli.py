@@ -165,6 +165,8 @@ from .network_scan import analyze_network_scans, format_text as format_netscan_t
 from .anti_forensics import analyze_anti_forensics, format_text as format_antifor_text, format_json as format_antifor_json, _load_events as _load_antifor_events
 from .config_tamper import analyze_config_tamper, format_text as format_ct_text, format_json as format_ct_json, _load_events as _load_ct_events
 from .model_theft import analyze_model_theft, format_text as format_mt_text, format_json as format_mt_json, _load_events as _load_mt_events
+from .token_exfil import analyze_token_exfil, format_text as format_te_text, format_json as format_te_json, _load_events as _load_te_events
+from .replay_attack import analyze_replay_attack, format_text as format_ra_text, format_json as format_ra_json, _load_events as _load_ra_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1119,6 +1121,16 @@ def build_parser() -> argparse.ArgumentParser:
     mt_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     mt_p.add_argument("--format", choices=["text", "json"], default="text")
     mt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    te_p = subparsers.add_parser("token-exfil", help="Detect token and credential exfiltration patterns")
+    te_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    te_p.add_argument("--format", choices=["text", "json"], default="text")
+    te_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ra_p = subparsers.add_parser("replay-attack", help="Detect replay attack patterns")
+    ra_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ra_p.add_argument("--format", choices=["text", "json"], default="text")
+    ra_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3222,6 +3234,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Model theft analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "token-exfil":
+        events = _load_te_events(str(args.evidence_dir))
+        report = analyze_token_exfil(events)
+        if args.format == "json":
+            output = format_te_json(report)
+        else:
+            output = format_te_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Token exfil analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "replay-attack":
+        events = _load_ra_events(str(args.evidence_dir))
+        report = analyze_replay_attack(events)
+        if args.format == "json":
+            output = format_ra_json(report)
+        else:
+            output = format_ra_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Replay attack analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
