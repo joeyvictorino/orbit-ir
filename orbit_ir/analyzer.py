@@ -173,6 +173,60 @@ def _confidence_label(score: float) -> str:
     return "low"
 
 
+_DETECTION_WEIGHTS: dict[str, float] = {
+    "spoofed_tool_calls": 30.0,
+    "lateral_movement": 25.0,
+    "unbacked_completions": 20.0,
+    "oracle_violations": 20.0,
+    "identity_trace_conflicts": 15.0,
+    "missing_records": 10.0,
+    "shared_credentials": 5.0,
+}
+
+
+def _composite_risk_score(
+    *,
+    spoofed: int,
+    lateral: int,
+    unbacked: int,
+    oracle: int,
+    identity_trace: int,
+    missing: int,
+    shared_creds: int,
+    total_transcripts: int,
+) -> dict:
+    if total_transcripts == 0:
+        return {"score": 0, "rating": "none", "components": {}}
+    components: dict[str, float] = {}
+    raw = 0.0
+    for name, count in [
+        ("spoofed_tool_calls", spoofed),
+        ("lateral_movement", lateral),
+        ("unbacked_completions", unbacked),
+        ("oracle_violations", oracle),
+        ("identity_trace_conflicts", identity_trace),
+        ("missing_records", missing),
+        ("shared_credentials", shared_creds),
+    ]:
+        w = _DETECTION_WEIGHTS[name]
+        fraction = min(count / max(total_transcripts, 1), 1.0)
+        component = w * fraction
+        components[name] = round(component, 2)
+        raw += component
+    score = round(min(raw / sum(_DETECTION_WEIGHTS.values()) * 100, 100), 1)
+    if score >= 75:
+        rating = "critical"
+    elif score >= 50:
+        rating = "high"
+    elif score >= 25:
+        rating = "medium"
+    elif score > 0:
+        rating = "low"
+    else:
+        rating = "none"
+    return {"score": score, "rating": rating, "components": components}
+
+
 def _finding(
     finding_number: int,
     tool_call_id: str,
@@ -455,6 +509,19 @@ def analyze_dataset(
     for item in findings:
         for technique in item.get("mitre_techniques", []):
             mitre_counts[f"{technique['id']} {technique['name']}"] += 1
+
+    total_transcripts = sum(len(rows) for rows in transcripts_by_call.values())
+    risk = _composite_risk_score(
+        spoofed=len(detected_spoofs),
+        lateral=len(lateral_movement),
+        unbacked=len(detected_unbacked),
+        oracle=len(detected_oracle),
+        identity_trace=reason_counts["agent-id-mismatch"] + reason_counts["trace-id-mismatch"],
+        missing=reason_counts["missing-transcript"] + reason_counts["missing-control-plane-event"],
+        shared_creds=len(shared_credentials),
+        total_transcripts=total_transcripts,
+    )
+
     summary = {
         "synthetic": True,
         "scenario": "Synthetic cross-agent coordination and transcript/control-plane inconsistency exercise",
@@ -496,6 +563,9 @@ def analyze_dataset(
             "timeline_events": len(timeline_events),
             "timeline_finding_events": timeline_finding_count,
             "timeline_assignment_events": timeline_assignment_count,
+            "risk_score": risk["score"],
+            "risk_rating": risk["rating"],
+            "risk_components": risk["components"],
         },
         "method": {
             "authoritative_source": "control_plane.jsonl for executed tool activity",
@@ -1041,6 +1111,16 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 8. {findings['lateral_movement_detections']:,} resource accesses crossed agent boundaries (lateral movement).
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
+
+## Composite risk score
+
+**{findings['risk_score']}/100 ({findings['risk_rating'].upper()})**
+
+The composite risk score weights detection types by operational severity. Components:
+
+| Category | Weight | Score |
+| --- | ---: | ---: |
+{chr(10).join(f"| {cat.replace('_', ' ').title()} | {_DETECTION_WEIGHTS[cat]:.0f} | {val:.2f} |" for cat, val in sorted(findings.get('risk_components', {}).items(), key=lambda x: -x[1]))}
 
 {_render_statistics_table(findings)}
 {_render_timeline(timeline_events or [])}

@@ -605,6 +605,42 @@ class LabTest(unittest.TestCase):
             self.assertEqual(sarif["version"], "2.1.0")
             self.assertGreater(len(sarif["runs"][0]["results"]), 0)
 
+    def test_composite_risk_score_in_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir)
+
+            self.assertIn("risk_score", summary["findings"])
+            self.assertIn("risk_rating", summary["findings"])
+            self.assertIn("risk_components", summary["findings"])
+
+            score = summary["findings"]["risk_score"]
+            self.assertGreaterEqual(score, 0)
+            self.assertLessEqual(score, 100)
+            self.assertIn(summary["findings"]["risk_rating"], {"none", "low", "medium", "high", "critical"})
+            self.assertGreater(score, 0)
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("Composite risk score", report)
+
+    def test_composite_risk_score_zero_when_clean(self) -> None:
+        from orbit_ir.analyzer import _composite_risk_score
+        result = _composite_risk_score(
+            spoofed=0, lateral=0, unbacked=0, oracle=0,
+            identity_trace=0, missing=0, shared_creds=0,
+            total_transcripts=100,
+        )
+        self.assertEqual(result["score"], 0)
+        self.assertEqual(result["rating"], "none")
+
     def test_lateral_movement_detected_with_resource_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
