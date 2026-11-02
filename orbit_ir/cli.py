@@ -83,6 +83,8 @@ from .stix_export import STIXExporter, export_stix
 from .executive_brief import ExecutiveBriefGenerator, generate_executive_brief, format_brief_text, format_brief_markdown
 from .ingest import EvidenceIngester, format_ingest_text
 from .report_template import TemplateReporter, list_templates, show_template, format_template_list
+from .attribution import load_and_attribute, format_attribution_text, summarize_attributions
+from .diff_timeline import load_and_diff, format_diff_text as format_diff_timeline_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -578,6 +580,21 @@ def build_parser() -> argparse.ArgumentParser:
     rt.add_argument("--title", type=str, default="Incident Report", help="Report title")
     rt.add_argument("--format", choices=["text", "markdown", "html"], default="text", help="Output format")
     rt.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    attr = subparsers.add_parser("attribution", help="Attribute evidence items to source agents and actions")
+    attr.add_argument("--timeline", type=Path, required=True, help="Timeline events file or directory")
+    attr.add_argument("--evidence", type=Path, required=True, help="Evidence items file or directory")
+    attr.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    attr.add_argument("--min-confidence", type=float, default=0.0, help="Minimum attribution confidence (0.0-1.0)")
+    attr.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dtl = subparsers.add_parser("diff-timeline", help="Compare two incident timelines and highlight differences")
+    dtl.add_argument("--baseline", type=Path, required=True, help="Baseline timeline file or directory")
+    dtl.add_argument("--compare", type=Path, required=True, help="Comparison timeline file or directory")
+    dtl.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    dtl.add_argument("--match-keys", type=str, default=None, help="Comma-separated keys for event matching")
+    dtl.add_argument("--threshold", type=float, default=60.0, help="Timing shift detection threshold in seconds")
+    dtl.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1448,6 +1465,66 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "attribution":
+        report = load_and_attribute(
+            args.timeline, args.evidence, min_confidence=args.min_confidence
+        )
+        if args.format == "json":
+            data = {
+                "attributions": [
+                    {
+                        "evidence_id": a.evidence_id,
+                        "source": {"name": a.source.name, "type": a.source.source_type, "confidence": a.source.confidence},
+                        "timestamp": a.timestamp,
+                        "action": a.action,
+                        "confidence": a.context.get("matched_confidence", 0),
+                        "chain": a.chain,
+                    }
+                    for a in report.attributions
+                ],
+                "unattributed": report.unattributed,
+                "sources": [
+                    {"name": s.name, "type": s.source_type, "confidence": s.confidence, "evidence_count": len(s.evidence_ids)}
+                    for s in report.sources
+                ],
+                "confidence_distribution": report.confidence_distribution,
+                "summary": summarize_attributions(report),
+            }
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_attribution_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Attribution report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "diff-timeline":
+        match_keys = None
+        if args.match_keys:
+            match_keys = [k.strip() for k in args.match_keys.split(",")]
+        diff = load_and_diff(
+            args.baseline, args.compare, match_keys=match_keys, threshold_seconds=args.threshold
+        )
+        if args.format == "json":
+            data = {
+                "added": diff.added,
+                "removed": diff.removed,
+                "modified": [{"baseline": old, "compare": new} for old, new in diff.modified],
+                "timing_shifts": diff.timing_shifts,
+                "summary": diff.summary,
+            }
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_diff_timeline_text(diff)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Timeline diff written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
