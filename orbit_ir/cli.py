@@ -181,6 +181,7 @@ from .container_escape import analyze_container_escapes, format_text as format_c
 from .auth_bypass import analyze_auth_bypass, format_text as format_ab_text, format_json as format_ab_json, _load_events as _load_ab_events
 from .resource_leak import analyze_resource_leaks, format_text as format_rl_text, format_json as format_rl_json, _load_events as _load_rl_events
 from .role_impersonation import analyze_role_impersonation, format_text as format_ri_text, format_json as format_ri_json, _load_events as _load_ri_events
+from .token_smuggle import analyze_token_smuggling, format_text as format_ts_text, format_json as format_ts_json, _load_events as _load_ts_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1225,6 +1226,11 @@ def build_parser() -> argparse.ArgumentParser:
     oh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     oh_p.add_argument("--format", choices=["text", "json"], default="text")
     oh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ts_p = subparsers.add_parser("token-smuggle", help="Detect token smuggling patterns in agent outputs")
+    ts_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ts_p.add_argument("--format", choices=["text", "json"], default="text")
+    ts_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3588,6 +3594,26 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Privilege delegation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "token-smuggle":
+        from orbit_ir.token_smuggle import (
+            analyze_token_smuggling,
+            format_json as format_ts_json,
+            format_text as format_ts_text,
+        )
+        from orbit_ir.token_smuggle import _load_events as _load_ts_events
+        events = _load_ts_events(str(args.evidence_dir))
+        report = analyze_token_smuggling(events)
+        if args.format == "json":
+            output = format_ts_json(report)
+        else:
+            output = format_ts_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Token smuggle analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
