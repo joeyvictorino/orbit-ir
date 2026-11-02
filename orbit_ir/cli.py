@@ -176,6 +176,8 @@ from .clock_manipulation import analyze_clock_manipulation, format_text as forma
 from .env_manipulation import analyze_env_manipulation, format_text as format_em_text, format_json as format_em_json, _load_events as _load_em_events
 from .shadow_api import analyze_shadow_apis, format_text as format_sapi_text, format_json as format_sapi_json, _load_events as _load_sapi_events
 from .llm_jailbreak import analyze_jailbreaks, format_text as format_jb_text, format_json as format_jb_json, _load_events as _load_jb_events
+from .api_key_leak import analyze_api_key_leaks, format_text as format_akl_text, format_json as format_akl_json, _load_events as _load_akl_events
+from .container_escape import analyze_container_escapes, format_text as format_ce_text, format_json as format_ce_json, _load_events as _load_ce_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1185,6 +1187,16 @@ def build_parser() -> argparse.ArgumentParser:
     jb_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     jb_p.add_argument("--format", choices=["text", "json"], default="text")
     jb_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    akl_p = subparsers.add_parser("api-key-leak", help="Detect API key and secret leakage in agent outputs")
+    akl_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    akl_p.add_argument("--format", choices=["text", "json"], default="text")
+    akl_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ce_p = subparsers.add_parser("container-escape", help="Detect container/sandbox escape attempts")
+    ce_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    ce_p.add_argument("--format", choices=["text", "json"], default="text")
+    ce_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3438,6 +3450,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"LLM jailbreak analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "api-key-leak":
+        events = _load_akl_events(str(args.evidence_dir))
+        report = analyze_api_key_leaks(events)
+        if args.format == "json":
+            output = format_akl_json(report)
+        else:
+            output = format_akl_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"API key leak analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "container-escape":
+        events = _load_ce_events(str(args.evidence_dir))
+        report = analyze_container_escapes(events)
+        if args.format == "json":
+            output = format_ce_json(report)
+        else:
+            output = format_ce_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Container escape analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
