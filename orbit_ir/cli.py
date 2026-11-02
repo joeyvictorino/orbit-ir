@@ -69,6 +69,8 @@ from .topology import load_and_build as load_topology, format_topology_text, for
 from .timeline_compare import load_and_compare, format_compare_text
 from .mitre_report import generate_mitre_report, format_mitre_report_text
 from .evidence_chain import build_evidence_chains, format_evidence_chain_text
+from .blast_radius import estimate_blast_radius, format_blast_radius_text
+from .remediate_ir import generate_remediations, format_remediate_text
 from .frequency import build_frequency as build_freq, format_frequency_text, load_and_build as load_frequency
 from .outlier import detect_outliers, format_outlier_text, load_and_detect as load_outliers
 
@@ -491,6 +493,18 @@ def build_parser() -> argparse.ArgumentParser:
     out_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     out_p.add_argument("--z-threshold", type=float, default=2.0, help="Z-score threshold (default: 2.0)")
     out_p.add_argument("--out", type=Path, default=None, help="Write output to file")
+
+    br = subparsers.add_parser("blast-radius", help="Estimate incident blast radius from evidence")
+    br.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    br.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    br.add_argument("--threshold", type=float, default=0.0, help="Minimum blast radius score to report (default: 0)")
+    br.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rem = subparsers.add_parser("remediate", help="Generate remediation suggestions from detected incidents")
+    rem.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    rem.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    rem.add_argument("--severity", default=None, help="Minimum severity filter (critical, high, medium, low)")
+    rem.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1185,6 +1199,34 @@ def _run(args: argparse.Namespace) -> None:
             print(output, end="")
         return
 
+    elif args.command == "blast-radius":
+        est = estimate_blast_radius(args.input)
+        data = est.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_blast_radius_text(data, threshold=args.threshold)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Blast radius report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "remediate":
+        gen = generate_remediations(args.input, severity_filter=args.severity)
+        data = gen.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_remediate_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Remediation report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"
