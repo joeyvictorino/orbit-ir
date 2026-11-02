@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .analyzer import analyze_dataset, filter_findings, verify_evidence
+from .analyzer import analyze_dataset, build_navigator_layer, filter_findings, verify_evidence
 from .diff import diff_results, format_diff_text
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
@@ -194,12 +194,9 @@ def _run(args: argparse.Namespace) -> None:
             layer_findings = json.loads(findings_path.read_text(encoding="utf-8"))
             layer = build_navigator_layer(layer_findings)
             layer_path = args.out / "navigator_layer.json"
-            layer_path.write_text(
-                json.dumps(layer, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
-        if args.navigator_layer:
-            layer_path = args.out / "navigator_layer.json"
-            print(layer_path.read_text(encoding="utf-8"), end="")
+            layer_text = json.dumps(layer, indent=2, sort_keys=True) + "\n"
+            layer_path.write_text(layer_text, encoding="utf-8")
+            print(layer_text, end="")
         elif args.format == "sarif":
             sarif_path = args.out / "findings.sarif"
             print(sarif_path.read_text(encoding="utf-8"), end="")
