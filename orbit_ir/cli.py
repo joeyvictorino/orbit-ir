@@ -26,6 +26,7 @@ from .merge import merge_evidence
 from .correlate import correlate_events, format_correlate_text
 from .export import export_findings
 from .fingerprint import fingerprint_agents, format_fingerprint_text
+from .scope import apply_scope
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -158,6 +159,14 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--format", choices=["csv", "cef", "sarif", "json"], default="csv", help="Output format")
     exp.add_argument("--out", type=Path, default=None, help="Write output to file instead of stdout")
 
+    sc = subparsers.add_parser("scope", help="Filter evidence by time window, agent set, or source before analysis")
+    sc.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    sc.add_argument("--out", type=Path, required=True, help="Output directory for scoped evidence")
+    sc.add_argument("--start", default=None, help="Start of time window (ISO-8601)")
+    sc.add_argument("--end", default=None, help="End of time window (ISO-8601)")
+    sc.add_argument("--agents", default=None, help="Comma-separated agent IDs to include")
+    sc.add_argument("--sources", default=None, help="Comma-separated sources: messages,transcripts,control_plane")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -258,6 +267,16 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "export":
         text = export_findings(args.input, args.format, output_path=args.out)
         print(text, end="")
+        return
+    elif args.command == "scope":
+        agents_list = args.agents.split(",") if args.agents else None
+        sources_list = args.sources.split(",") if args.sources else None
+        result = apply_scope(
+            args.input, args.out,
+            start=args.start, end=args.end,
+            agents=agents_list, sources=sources_list,
+        )
+        print(json.dumps(result, sort_keys=True, indent=2))
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
