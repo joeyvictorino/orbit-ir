@@ -23,6 +23,7 @@ from .timeline import build_timeline, format_json as format_timeline_json, forma
 from .cef import findings_to_cef
 from .validate import validate_evidence
 from .merge import merge_evidence
+from .correlate import correlate_events, format_correlate_text
 from .fingerprint import fingerprint_agents, format_fingerprint_text
 
 
@@ -146,6 +147,11 @@ def build_parser() -> argparse.ArgumentParser:
     fp.add_argument("--input", type=Path, required=True, help="Evidence directory")
     fp.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    corr = subparsers.add_parser("correlate", help="Cross-link events across evidence sources by agent and time")
+    corr.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    corr.add_argument("--time-window", type=int, default=5, help="Time window in seconds (default: 5)")
+    corr.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -235,6 +241,13 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_fingerprint_text(result), end="")
+        return
+    elif args.command == "correlate":
+        result = correlate_events(args.input, time_window_seconds=args.time_window)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_correlate_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
