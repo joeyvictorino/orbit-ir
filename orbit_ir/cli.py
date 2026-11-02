@@ -67,6 +67,8 @@ from .reconstruct import reconstruct_incident, format_reconstruct_text
 from .ioc import extract_iocs, format_ioc_text
 from .topology import load_and_build as load_topology, format_topology_text, format_topology_dot
 from .timeline_compare import load_and_compare, format_compare_text
+from .mitre_report import generate_mitre_report, format_mitre_report_text
+from .evidence_chain import build_evidence_chains, format_evidence_chain_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -464,6 +466,18 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Filter to specific IOC type (ipv4, domain, md5, sha256, url, email, file_path, command)")
     ioc_parser.add_argument("--min-count", type=int, default=1, help="Minimum occurrence count (default: 1)")
     ioc_parser.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    mr = subparsers.add_parser("mitre-report", help="MITRE ATT&CK coverage report from evidence")
+    mr.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    mr.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    mr.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ec = subparsers.add_parser("evidence-chain", help="Build causal chains linking events by shared entities")
+    ec.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    ec.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ec.add_argument("--min-chain-length", type=int, default=2, help="Minimum events in a chain (default: 2)")
+    ec.add_argument("--max-chains", type=int, default=20, help="Maximum chains to show (default: 20)")
+    ec.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1096,6 +1110,38 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"IOCs written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "mitre-report":
+        gen = generate_mitre_report(args.input)
+        data = gen.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_mitre_report_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"MITRE report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "evidence-chain":
+        builder = build_evidence_chains(
+            args.input,
+            min_chain_length=args.min_chain_length,
+            max_chains=args.max_chains,
+        )
+        data = builder.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_evidence_chain_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Evidence chains written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
