@@ -34,6 +34,8 @@ from .bundle import create_bundle, format_bundle_text
 from .compare_agents import compare_agents, format_comparison_text
 from .replay import replay_events, format_replay_text
 from .enrich import enrich_evidence, format_enrich_text
+from .policy import load_policy, evaluate_policy, format_policy_text
+from .simulate import generate_evidence as simulate_evidence, list_scenarios, format_simulate_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -215,6 +217,20 @@ def build_parser() -> argparse.ArgumentParser:
     enr.add_argument("--enrichments", default=None,
                      help="Comma-separated enrichments: tool_docs,agent_roles,risk_tags (default: all)")
 
+    pol = subparsers.add_parser("policy", help="Evaluate evidence against user-defined detection rules")
+    pol.add_argument("--rules", type=Path, required=True, help="Policy YAML file with detection rules")
+    pol.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    pol.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+    pol.add_argument("--severity", default=None, help="Minimum severity filter (LOW, MEDIUM, HIGH, CRITICAL)")
+
+    sim = subparsers.add_parser("simulate", help="Generate synthetic evidence for testing detection pipelines")
+    sim.add_argument("--output", type=Path, required=True, help="Output directory for generated evidence")
+    sim.add_argument("--scenario", required=True,
+                     help=f"Scenario: {', '.join(list_scenarios().keys())}")
+    sim.add_argument("--agents", type=int, default=3, help="Number of agents (default: 3)")
+    sim.add_argument("--events", type=int, default=20, help="Number of events (default: 20)")
+    sim.add_argument("--seed", type=int, default=42, help="Random seed for deterministic output (default: 42)")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -384,6 +400,23 @@ def _run(args: argparse.Namespace) -> None:
         enrichment_list = args.enrichments.split(",") if args.enrichments else None
         result = enrich_evidence(args.input, args.output, enrichments=enrichment_list)
         print(format_enrich_text(result), end="")
+        return
+    elif args.command == "policy":
+        pol = load_policy(args.rules)
+        violations = evaluate_policy(pol, args.input, severity_filter=args.severity)
+        if args.format == "json":
+            print(json.dumps(violations, sort_keys=True, indent=2))
+        else:
+            print(format_policy_text(violations), end="")
+        if violations:
+            raise SystemExit(1)
+        return
+    elif args.command == "simulate":
+        result = simulate_evidence(
+            args.output, args.scenario,
+            num_agents=args.agents, num_events=args.events, seed=args.seed,
+        )
+        print(format_simulate_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
