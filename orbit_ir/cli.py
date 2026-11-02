@@ -43,6 +43,8 @@ from .schema_def import validate_evidence_schema, format_schema_text, format_val
 from .normalize import normalize_evidence, format_normalize_text
 from .tag import tag_events, list_tags, filter_by_tag, format_tag_text
 from .search import search_evidence as search_evidence_fn, format_search_text
+from .report_gen import generate_report, ReportConfig
+from .chain import parse_chain, run_chain, format_chain_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -288,6 +290,21 @@ def build_parser() -> argparse.ArgumentParser:
     srch.add_argument("--after", help="Events after this ISO timestamp")
     srch.add_argument("--before", help="Events before this ISO timestamp")
     srch.add_argument("--format", choices=["json", "text"], default="text", dest="output_format")
+
+    rpt = subparsers.add_parser("report", help="Generate a customizable analysis report with selectable sections")
+    rpt.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    rpt.add_argument("--sections", default=None,
+                     help="Comma-separated sections: summary,findings,agents,timeline,tools,recommendations (default: all)")
+    rpt.add_argument("--severity", default=None,
+                     help="Minimum severity threshold (low, medium, high, critical)")
+    rpt.add_argument("--format", choices=["text", "markdown"], default="text", help="Output format")
+    rpt.add_argument("--title", default="Orbit-IR Analysis Report", help="Report title")
+    rpt.add_argument("--output", type=Path, default=None, help="Write report to file instead of stdout")
+
+    ch = subparsers.add_parser("chain", help="Run a multi-step analysis pipeline from a YAML definition")
+    ch.add_argument("--pipeline", type=Path, required=True, help="Pipeline YAML file")
+    ch.add_argument("--input", type=Path, required=True, help="Base evidence directory")
+    ch.add_argument("--work-dir", type=Path, default=None, help="Working directory for intermediate outputs")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -575,6 +592,32 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(results, sort_keys=True, indent=2, default=str))
         else:
             print(format_search_text(results), end="")
+        return
+    elif args.command == "report":
+        sections = args.sections.split(",") if args.sections else None
+        config = ReportConfig(
+            title=args.title,
+            sections=sections or list(("summary", "findings", "agents", "timeline", "tools", "recommendations")),
+            severity_threshold=args.severity,
+            format=args.format,
+        )
+        text = generate_report(args.input, config)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(text, encoding="utf-8")
+            print(f"Report written to {args.output}", file=sys.stderr)
+        else:
+            print(text, end="")
+        return
+    elif args.command == "chain":
+        import tempfile
+        pipeline_text = args.pipeline.read_text(encoding="utf-8")
+        steps = parse_chain(pipeline_text)
+        work = args.work_dir or Path(tempfile.mkdtemp(prefix="orbit-chain-"))
+        result = run_chain(steps, args.input, work)
+        print(format_chain_text(result), end="")
+        if result["failed"] > 0:
+            raise SystemExit(1)
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
