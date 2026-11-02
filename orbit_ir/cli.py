@@ -1242,6 +1242,16 @@ def build_parser() -> argparse.ArgumentParser:
     op_p.add_argument("--format", choices=["text", "json"], default="text")
     op_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
+    wd_p = subparsers.add_parser("worm-detect", help="Detect self-replicating agent (worm) patterns")
+    wd_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    wd_p.add_argument("--format", choices=["text", "json"], default="text")
+    wd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cd_p = subparsers.add_parser("config-drift", help="Detect unauthorized configuration changes by agents")
+    cd_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    cd_p.add_argument("--format", choices=["text", "json"], default="text")
+    cd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -3664,6 +3674,46 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Output poisoning analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "worm-detect":
+        from orbit_ir.worm_detect import (
+            analyze_worm_detection,
+            format_json as format_wd_json,
+            format_text as format_wd_text,
+        )
+        from orbit_ir.worm_detect import _load_events as _load_wd_events
+        events = _load_wd_events(str(args.evidence_dir))
+        report = analyze_worm_detection(events)
+        if args.format == "json":
+            output = format_wd_json(report)
+        else:
+            output = format_wd_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Worm detection analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "config-drift":
+        from orbit_ir.config_drift import (
+            analyze_config_drift,
+            format_json as format_cd_json,
+            format_text as format_cd_text,
+        )
+        from orbit_ir.config_drift import _load_events as _load_cd_events
+        events = _load_cd_events(str(args.evidence_dir))
+        report = analyze_config_drift(events)
+        if args.format == "json":
+            output = format_cd_json(report)
+        else:
+            output = format_cd_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Config drift analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
