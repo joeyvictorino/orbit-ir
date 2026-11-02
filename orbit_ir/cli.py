@@ -63,6 +63,8 @@ from .correlate_agents import correlate_agents_analysis, format_correlate_agents
 from .sentiment import analyze_sentiment, format_sentiment_text
 from .profile_agents import profile_agents, format_profile_text
 from .benchmark import run_benchmark, format_benchmark_text
+from .reconstruct import reconstruct_incident, format_reconstruct_text
+from .ioc import extract_iocs, format_ioc_text
 from .topology import load_and_build as load_topology, format_topology_text, format_topology_dot
 from .timeline_compare import load_and_compare, format_compare_text
 
@@ -449,6 +451,19 @@ def build_parser() -> argparse.ArgumentParser:
     tc.add_argument("--b", type=Path, required=True, help="Second timeline JSONL")
     tc.add_argument("--out", type=Path, default=None, help="Output file (default: stdout)")
     tc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    recon = subparsers.add_parser("reconstruct", help="Build an incident narrative from evidence events")
+    recon.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    recon.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    recon.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ioc_parser = subparsers.add_parser("ioc", help="Extract indicators of compromise from evidence")
+    ioc_parser.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    ioc_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ioc_parser.add_argument("--type", default=None, dest="ioc_type",
+                            help="Filter to specific IOC type (ipv4, domain, md5, sha256, url, email, file_path, command)")
+    ioc_parser.add_argument("--min-count", type=int, default=1, help="Minimum occurrence count (default: 1)")
+    ioc_parser.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1057,6 +1072,33 @@ def _run(args: argparse.Namespace) -> None:
             print(cef_text, end="")
         else:
             print(json.dumps(summary, sort_keys=True))
+    elif args.command == "reconstruct":
+        r = reconstruct_incident(args.input)
+        if args.format == "json":
+            output = json.dumps(r.to_dict(), sort_keys=True, indent=2)
+        else:
+            output = format_reconstruct_text(r)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Narrative written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "ioc":
+        extractor = extract_iocs(args.input)
+        data = extractor.to_dict()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        else:
+            output = format_ioc_text(data, type_filter=args.ioc_type, min_count=args.min_count)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"IOCs written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
     else:
         data_dir = args.workdir / "evidence"
         result_dir = args.workdir / "results"
