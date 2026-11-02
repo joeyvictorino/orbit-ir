@@ -141,6 +141,10 @@ from .log_anomaly import analyze_log_anomalies, format_text as format_la_text, f
 from .agent_drift import analyze_agent_drift, format_text as format_ad_text, format_json as format_ad_json, _load_events as _load_ad_events
 from .response_time import analyze_response_times, format_text as format_rt_text, format_json as format_rt_json, _load_events as _load_rt_events
 from .action_sequence import analyze_action_sequences, format_text as format_as_text, format_json as format_as_json
+from .insider_threat import analyze as analyze_insider_threat, format_text as format_it_text, format_json as format_it_json, _load_events as _load_it_events
+from .exfil_rate import analyze_exfil_rates, format_text as format_er_text, format_json as format_er_json, _load_events as _load_er_events
+from .event_cluster import analyze_event_clusters, format_text as format_ec_text, format_json as format_ec_json, _load_events as _load_ec_events
+from .tool_chain import analyze_tool_chains, format_text as format_tch_text, format_json as format_tch_json, _load_events as _load_tch_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -958,6 +962,32 @@ def build_parser() -> argparse.ArgumentParser:
     as_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
     as_p.add_argument("--min-frequency", type=int, default=2, help="Minimum pattern frequency")
     as_p.add_argument("--max-length", type=int, default=5, help="Maximum sequence length")
+
+    ec_p = subparsers.add_parser("event-cluster", help="Cluster events by temporal proximity and detect campaigns")
+    ec_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ec_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ec_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    ec_p.add_argument("--gap", type=float, default=60.0, help="Seconds gap to split clusters")
+    ec_p.add_argument("--burst-min", type=int, default=5, help="Minimum events for burst detection")
+    ec_p.add_argument("--burst-max", type=float, default=30.0, help="Maximum seconds for burst window")
+
+    tch_p = subparsers.add_parser("tool-chain", help="Analyze tool invocation chains and detect suspicious sequences")
+    tch_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    tch_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    tch_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    tch_p.add_argument("--chain-gap", type=float, default=120.0, help="Seconds gap to split chains")
+
+    it_p = subparsers.add_parser("insider-threat", help="Detect insider threat patterns in agent behavior")
+    it_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    it_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    it_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    er_p = subparsers.add_parser("exfil-rate", help="Analyze exfiltration transfer rates and detect anomalies")
+    er_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    er_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    er_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    er_p.add_argument("--burst-threshold", type=int, default=10000, help="Bytes threshold for burst detection")
+    er_p.add_argument("--window", type=int, default=300, help="Window size in seconds for burst detection")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2719,6 +2749,62 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Action sequence analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "event-cluster":
+        events = _load_ec_events(args.evidence_dir)
+        report = analyze_event_clusters(events, gap_threshold_seconds=args.gap, burst_min_events=args.burst_min, burst_max_seconds=args.burst_max)
+        if args.format == "json":
+            output = format_ec_json(report)
+        else:
+            output = format_ec_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Event cluster analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "tool-chain":
+        events = _load_tch_events(args.evidence_dir)
+        report = analyze_tool_chains(events, chain_gap_seconds=args.chain_gap)
+        if args.format == "json":
+            output = format_tch_json(report)
+        else:
+            output = format_tch_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Tool chain analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "insider-threat":
+        events, control = _load_it_events(args.evidence_dir)
+        report = analyze_insider_threat(events, control)
+        if args.format == "json":
+            output = format_it_json(report)
+        else:
+            output = format_it_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Insider threat analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "exfil-rate":
+        events = _load_er_events(args.evidence_dir)
+        report = analyze_exfil_rates(events, burst_threshold=args.burst_threshold, window_seconds=args.window)
+        if args.format == "json":
+            output = format_er_json(report)
+        else:
+            output = format_er_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Exfiltration rate analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
