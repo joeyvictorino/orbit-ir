@@ -128,6 +128,8 @@ from .threat_model import analyze as analyze_threat_model, format_text as format
 from .capability_map import analyze_capability_map, format_text as format_cm_text, format_json as format_cm_json, _load_events as _load_cm_events
 from .session_stats import analyze as analyze_session_stats, format_text as format_ss_text, format_json as format_ss_json
 from .role_drift import analyze_role_drift, format_text as format_rd_text, format_json as format_rd_json, _load_events as _load_rd_events
+from .deception_detect import analyze_deception, format_text as format_deception_text, format_json as format_deception_json, _load_events as _load_deception_events
+from .goal_drift import analyze_goal_drift, format_text as format_goaldrift_text, format_json as format_goaldrift_json, _load_events as _load_goaldrift_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -875,6 +877,17 @@ def build_parser() -> argparse.ArgumentParser:
     ss_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     ss_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     ss_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    deception_p = subparsers.add_parser("deception-detect", help="Detect agent deception patterns in behavior evidence")
+    deception_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    deception_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    deception_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    goaldrift_p = subparsers.add_parser("goal-drift", help="Detect agent goal deviation and objective drift")
+    goaldrift_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    goaldrift_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    goaldrift_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    goaldrift_p.add_argument("--window-size", type=int, default=10, help="Sliding window size for goal state analysis")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2454,6 +2467,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Session stats written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "deception-detect":
+        events = _load_deception_events(args.evidence_dir)
+        report = analyze_deception(events)
+        if args.format == "json":
+            output = format_deception_json(report)
+        else:
+            output = format_deception_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Deception detection report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "goal-drift":
+        events = _load_goaldrift_events(args.evidence_dir)
+        report = analyze_goal_drift(events, window_size=args.window_size)
+        if args.format == "json":
+            output = format_goaldrift_json(report)
+        else:
+            output = format_goaldrift_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Goal drift analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
