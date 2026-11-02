@@ -88,6 +88,7 @@ from .diff_timeline import load_and_diff, format_diff_text as format_diff_timeli
 from .kill_chain import load_and_analyze as load_and_analyze_kill_chain, format_kill_chain_text
 from .impact import analyze_impact, format_impact_text
 from .counterfactual import analyze_counterfactual, format_counterfactual_text
+from .privesc import analyze_privilege_escalation, format_text as format_privesc_text, format_json as format_privesc_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -616,6 +617,11 @@ def build_parser() -> argparse.ArgumentParser:
     cf.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     cf.add_argument("--scenarios", type=Path, default=None, help="YAML/JSON file defining custom scenarios")
     cf.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    pe = subparsers.add_parser("privilege-escalation", help="Detect privilege escalation paths in agent control events")
+    pe.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    pe.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    pe.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1592,6 +1598,22 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Counterfactual analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "privilege-escalation":
+        from .blast_radius import _load_events as _load_pe
+        evidence_events = _load_pe(args.evidence_dir)
+        control = [e for e in evidence_events if e.get("actual_tool") or e.get("policy_decision")]
+        report = analyze_privilege_escalation(evidence_events, control)
+        if args.format == "json":
+            output = format_privesc_json(report)
+        else:
+            output = format_privesc_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Privilege escalation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
