@@ -79,6 +79,8 @@ from .timeline_export import export_timeline, TimelineExporter
 from .agent_profile import profile_evidence_agents, format_agent_profile_text
 from .compliance_map import map_compliance, format_compliance_map_text
 from .evidence_score import score_evidence, format_evidence_score_text
+from .stix_export import STIXExporter, export_stix
+from .executive_brief import ExecutiveBriefGenerator, generate_executive_brief, format_brief_text, format_brief_markdown
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -547,6 +549,18 @@ def build_parser() -> argparse.ArgumentParser:
     es.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
     es.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     es.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    stix = subparsers.add_parser("stix", help="Export evidence as STIX 2.1 cyber threat intelligence bundle")
+    stix.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    stix.add_argument("--include-indicators", action="store_true", default=False, help="Extract IP/domain indicators from events")
+    stix.add_argument("--format", choices=["json"], default="json", help="Output format")
+    stix.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    eb = subparsers.add_parser("executive-brief", help="Generate one-page executive briefing from evidence")
+    eb.add_argument("--input", type=Path, required=True, help="Evidence directory or file")
+    eb.add_argument("--classification", default="CONFIDENTIAL", help="Document classification level")
+    eb.add_argument("--format", choices=["text", "json", "markdown"], default="text", help="Output format")
+    eb.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1353,6 +1367,35 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Evidence score written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "stix":
+        exporter = STIXExporter()
+        exporter.load_events(args.input)
+        bundle = exporter.to_stix_bundle(include_indicators=args.include_indicators)
+        output = json.dumps(bundle, sort_keys=True, indent=2)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"STIX bundle written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "executive-brief":
+        gen = ExecutiveBriefGenerator(classification=args.classification)
+        gen.load_events(args.input)
+        data = gen.generate()
+        if args.format == "json":
+            output = json.dumps(data, sort_keys=True, indent=2)
+        elif args.format == "markdown":
+            output = format_brief_markdown(data)
+        else:
+            output = format_brief_text(data)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Executive brief written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
