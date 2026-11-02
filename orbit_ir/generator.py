@@ -206,8 +206,8 @@ def generate_dataset(output_dir: Path, config: LabConfig) -> dict:
     for row in control_rows:
         cred = row["credential_id"]
         credential_agent_sets.setdefault(cred, set()).add(row["agent_id"])
-    shared_credential_count = sum(
-        1 for agents_set in credential_agent_sets.values() if len(agents_set) > 1
+    shared_credential_ids = sorted(
+        cred for cred, agents_set in credential_agent_sets.items() if len(agents_set) > 1
     )
 
     truth = {
@@ -217,7 +217,8 @@ def generate_dataset(output_dir: Path, config: LabConfig) -> dict:
         "spoofed_tool_call_ids": sorted(spoofed_tool_call_ids),
         "unbacked_completion_tool_call_ids": sorted(unbacked_completion_ids),
         "oracle_modification_tool_call_ids": sorted(oracle_modification_ids),
-        "shared_credential_count": shared_credential_count,
+        "shared_credential_ids": shared_credential_ids,
+        "shared_credential_count": len(shared_credential_ids),
         "scenario": "Synthetic cross-agent coordination and transcript/tool-call inconsistency exercise",
         "synthetic": True,
     }
