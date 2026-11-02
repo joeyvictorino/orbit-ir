@@ -157,6 +157,8 @@ from .policy_enforce import analyze as analyze_policy_enforce, format_text as fo
 from .signal_noise import analyze as analyze_signal_noise, format_text as format_signoise_text, format_json as format_signoise_json
 from .social_engineering import analyze as analyze_social_eng, format_text as format_se_text, format_json as format_se_json, _load_events as _load_se_events
 from .timing_attack import analyze as analyze_timing_attack, format_text as format_ta_text, format_json as format_ta_json, _load_events as _load_ta_events
+from .resource_hijack import analyze as analyze_resource_hijack, format_text as format_rh_text, format_json as format_rh_json, _load_events as _load_rh_events
+from .data_poisoning import analyze as analyze_data_poisoning, format_text as format_dp_text, format_json as format_dp_json, _load_events as _load_dp_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1071,6 +1073,16 @@ def build_parser() -> argparse.ArgumentParser:
     ta_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     ta_p.add_argument("--format", choices=["text", "json"], default="text")
     ta_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    rh_p = subparsers.add_parser("resource-hijack", help="Detect resource hijacking patterns")
+    rh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    rh_p.add_argument("--format", choices=["text", "json"], default="text")
+    rh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dp_p = subparsers.add_parser("data-poisoning", help="Detect data poisoning patterns")
+    dp_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    dp_p.add_argument("--format", choices=["text", "json"], default="text")
+    dp_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3060,6 +3072,36 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Timing attack analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "resource-hijack":
+        events = _load_rh_events(args.evidence_dir / "transcripts.jsonl")
+        control = _load_rh_events(args.evidence_dir / "control_plane.jsonl")
+        report = analyze_resource_hijack(events, control)
+        if args.format == "json":
+            output = format_rh_json(report)
+        else:
+            output = format_rh_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Resource hijack analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "data-poisoning":
+        events = _load_dp_events(args.evidence_dir / "transcripts.jsonl")
+        control = _load_dp_events(args.evidence_dir / "control_plane.jsonl")
+        report = analyze_data_poisoning(events, control)
+        if args.format == "json":
+            output = format_dp_json(report)
+        else:
+            output = format_dp_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Data poisoning analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
