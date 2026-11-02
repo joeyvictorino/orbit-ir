@@ -140,6 +140,38 @@ def _mitre_for_reasons(reasons: list[str]) -> list[dict[str, str]]:
     return result
 
 
+def _confidence_score(
+    transcripts: list[tuple[int, dict]],
+    controls: list[tuple[int, dict]],
+    reasons: list[str],
+) -> float:
+    score = 0.5
+    has_transcript = len(transcripts) >= 1
+    has_control = len(controls) >= 1
+    if has_transcript and has_control:
+        score += 0.25
+    elif has_transcript or has_control:
+        score += 0.10
+    corroborating = {
+        "tool-name-mismatch", "argument-digest-mismatch", "unbacked-completion",
+        "oracle-integrity-violation", "agent-id-mismatch", "trace-id-mismatch",
+    }
+    corroborating_count = sum(1 for r in reasons if r in corroborating)
+    score += min(corroborating_count * 0.05, 0.15)
+    has_duplicates = any(r.startswith("duplicate-") for r in reasons)
+    if has_duplicates:
+        score -= 0.10
+    return round(min(max(score, 0.0), 1.0), 2)
+
+
+def _confidence_label(score: float) -> str:
+    if score >= 0.80:
+        return "high"
+    if score >= 0.60:
+        return "medium"
+    return "low"
+
+
 def _finding(
     finding_number: int,
     tool_call_id: str,
@@ -149,6 +181,7 @@ def _finding(
 ) -> dict:
     transcript = _first(transcripts)
     control = _first(controls)
+    score = _confidence_score(transcripts, controls, reasons)
     return {
         "finding_id": f"finding-{finding_number:06d}",
         "tool_call_id": tool_call_id,
@@ -165,7 +198,8 @@ def _finding(
         "claimed_tool": transcript.get("claimed_tool"),
         "actual_tool": control.get("actual_tool"),
         "effect": control.get("effect"),
-        "confidence": "medium" if any(reason.startswith("duplicate-") for reason in reasons) else "high",
+        "confidence": _confidence_label(score),
+        "confidence_score": score,
     }
 
 
@@ -398,6 +432,8 @@ def analyze_dataset(
     timeline_assignment_count = sum(1 for e in timeline_events if e["event_type"] == "coordinator-assignment")
 
     reason_counts = Counter(reason for item in findings for reason in item["reasons"])
+    confidence_bands = Counter(_confidence_label(item["confidence_score"]) for item in findings)
+    avg_confidence = round(sum(item["confidence_score"] for item in findings) / len(findings), 3) if findings else 0.0
     mitre_counts: Counter[str] = Counter()
     for item in findings:
         for technique in item.get("mitre_techniques", []):
@@ -435,6 +471,8 @@ def analyze_dataset(
             "trajectory_records": len(trajectories),
             "shared_credentials": len(shared_credentials),
             "reason_counts": dict(sorted(reason_counts.items())),
+            "confidence_bands": {"high": confidence_bands.get("high", 0), "medium": confidence_bands.get("medium", 0), "low": confidence_bands.get("low", 0)},
+            "average_confidence_score": avg_confidence,
             "mitre_technique_counts": dict(sorted(mitre_counts.items())),
             "timeline_events": len(timeline_events),
             "timeline_finding_events": timeline_finding_count,
@@ -469,11 +507,15 @@ def analyze_dataset(
             "coordinator_detection": _prf(detected_coordinators, set(truth["coordinators"])),
             "unbacked_completion_detection": _prf(detected_unbacked, set(truth.get("unbacked_completion_tool_call_ids", []))),
             "oracle_modification_detection": _prf(detected_oracle, set(truth.get("oracle_modification_tool_call_ids", []))),
+            "credential_reuse_detection": _prf(set(shared_credentials), set(truth.get("shared_credential_ids", []))),
             "interpretation": "The evaluation fixture was consulted only after detections were complete. Scores measure recovery on generated data, not expected production accuracy.",
         }
 
     (output_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (output_dir / "findings.json").write_text(
+        json.dumps(findings, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (output_dir / "trajectories.json").write_text(
         json.dumps(trajectories, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -528,7 +570,7 @@ def analyze_dataset(
         "finding_id", "tool_call_id", "agent_id_transcript", "agent_id_control",
         "trace_id_transcript", "trace_id_control", "reasons", "mitre_techniques",
         "transcript_source", "transcript_line", "control_source", "control_line",
-        "claimed_tool", "actual_tool", "effect", "confidence",
+        "claimed_tool", "actual_tool", "effect", "confidence", "confidence_score",
     )
     with (output_dir / "findings.csv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
@@ -636,6 +678,40 @@ def _render_data_quality(data_quality: dict) -> str:
 """
 
 
+def _render_statistics_table(findings_summary: dict) -> str:
+    reason_counts = findings_summary.get("reason_counts", {})
+    bands = findings_summary.get("confidence_bands", {})
+    avg = findings_summary.get("average_confidence_score", 0.0)
+    if not reason_counts and not bands:
+        return ""
+    lines = ["## Finding statistics", ""]
+    if reason_counts:
+        lines.append("### By detection type")
+        lines.append("")
+        lines.append("| Detection type | Count |")
+        lines.append("| --- | ---: |")
+        for reason, count in sorted(reason_counts.items(), key=lambda x: -x[1]):
+            lines.append(f"| {reason} | {count:,} |")
+        lines.append("")
+    if bands:
+        total = sum(bands.values())
+        lines.append("### By confidence band")
+        lines.append("")
+        lines.append("| Band | Count | Share |")
+        lines.append("| --- | ---: | ---: |")
+        for band in ("high", "medium", "low"):
+            c = bands.get(band, 0)
+            pct = f"{100 * c / total:.1f}%" if total > 0 else "0.0%"
+            lines.append(f"| {band} | {c:,} | {pct} |")
+        lines.append(f"| **total** | **{total:,}** | |")
+        lines.append("")
+        lines.append(f"Average confidence score: **{avg:.3f}**")
+        lines.append("")
+    lines.append("Confidence scoring: a finding backed by both transcript and control-plane evidence with multiple corroborating conflicts scores highest. Duplicate records reduce confidence.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
@@ -654,6 +730,7 @@ def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | 
 | Coordinator threshold | {evaluation['coordinator_detection']['precision']:.4f} | {evaluation['coordinator_detection']['recall']:.4f} | {evaluation['coordinator_detection']['true_positive']} | {evaluation['coordinator_detection']['false_positive']} | {evaluation['coordinator_detection']['false_negative']} |
 | Unbacked completion | {evaluation['unbacked_completion_detection']['precision']:.4f} | {evaluation['unbacked_completion_detection']['recall']:.4f} | {evaluation['unbacked_completion_detection']['true_positive']} | {evaluation['unbacked_completion_detection']['false_positive']} | {evaluation['unbacked_completion_detection']['false_negative']} |
 | Oracle integrity | {evaluation['oracle_modification_detection']['precision']:.4f} | {evaluation['oracle_modification_detection']['recall']:.4f} | {evaluation['oracle_modification_detection']['true_positive']} | {evaluation['oracle_modification_detection']['false_positive']} | {evaluation['oracle_modification_detection']['false_negative']} |
+| Credential reuse | {evaluation['credential_reuse_detection']['precision']:.4f} | {evaluation['credential_reuse_detection']['recall']:.4f} | {evaluation['credential_reuse_detection']['true_positive']} | {evaluation['credential_reuse_detection']['false_positive']} | {evaluation['credential_reuse_detection']['false_negative']} |
 
 The fixture is consulted only after detection. It does not determine the findings or the number of coordinators reported.
 """
@@ -687,6 +764,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
+{_render_statistics_table(findings)}
 {_render_timeline(timeline_events or [])}
 {_render_mitre_section(findings)}
 {_render_data_quality(data_quality or {})}

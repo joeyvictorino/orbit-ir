@@ -372,5 +372,84 @@ class LabTest(unittest.TestCase):
             self.assertIn("missing evidence source", stderr.getvalue())
 
 
+    def test_confidence_scores_in_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            findings = json.loads((results_dir / "findings.json").read_text())
+            self.assertGreater(len(findings), 0, "no findings generated")
+            for item in findings:
+                self.assertIn("confidence_score", item, f"{item['finding_id']} missing confidence_score")
+                self.assertIn("confidence", item, f"{item['finding_id']} missing confidence label")
+                score = item["confidence_score"]
+                self.assertIsInstance(score, float, f"{item['finding_id']} score should be float")
+                self.assertGreaterEqual(score, 0.0)
+                self.assertLessEqual(score, 1.0)
+                label = item["confidence"]
+                self.assertIn(label, ("high", "medium", "low"))
+                if score >= 0.80:
+                    self.assertEqual(label, "high")
+                elif score >= 0.60:
+                    self.assertEqual(label, "medium")
+                else:
+                    self.assertEqual(label, "low")
+
+            bands = summary["findings"]["confidence_bands"]
+            self.assertIn("high", bands)
+            self.assertIn("medium", bands)
+            self.assertIn("low", bands)
+            self.assertEqual(bands["high"] + bands["medium"] + bands["low"], len(findings))
+            self.assertGreater(summary["findings"]["average_confidence_score"], 0.0)
+
+    def test_statistics_table_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Finding statistics", report)
+            self.assertIn("### By detection type", report)
+            self.assertIn("### By confidence band", report)
+            self.assertIn("Average confidence score:", report)
+
+    def test_confidence_score_in_csv(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir)
+
+            with (results_dir / "findings.csv").open() as f:
+                reader = csv.DictReader(f)
+                self.assertIn("confidence_score", reader.fieldnames)
+                for row in reader:
+                    score = float(row["confidence_score"])
+                    self.assertGreaterEqual(score, 0.0)
+                    self.assertLessEqual(score, 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()
