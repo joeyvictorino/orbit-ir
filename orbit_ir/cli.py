@@ -29,6 +29,7 @@ from .fingerprint import fingerprint_agents, format_fingerprint_text
 from .scope import apply_scope
 from .summary import build_executive_summary, format_summary_text
 from .dedup import deduplicate_findings, format_dedup_summary
+from .audit import audit_evidence, format_audit_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -180,6 +181,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Dedup strategy: exact (same type+agent+reasons) or fuzzy (same type+agent)")
     dedup.add_argument("--format", choices=["json", "text"], default="json", help="Output format for summary")
 
+    aud = subparsers.add_parser("audit", help="Reproducibility audit: hash evidence, verify completeness, cross-check agents")
+    aud.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    aud.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -305,6 +310,15 @@ def _run(args: argparse.Namespace) -> None:
             }, sort_keys=True, indent=2))
         else:
             print(summary_text, end="")
+        return
+    elif args.command == "audit":
+        report = audit_evidence(args.input)
+        if args.format == "json":
+            print(json.dumps(report, sort_keys=True, indent=2))
+        else:
+            print(format_audit_text(report), end="")
+        if not report["passed"]:
+            raise SystemExit(1)
         return
     elif args.command == "scope":
         agents_list = args.agents.split(",") if args.agents else None
