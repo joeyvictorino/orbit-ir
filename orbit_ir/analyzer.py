@@ -208,10 +208,12 @@ def analyze_dataset(
     message_count = 0
     board_message_count = 0
     timestamps: list[datetime] = []
+    timeline_events: list[dict] = []
 
     for line_number, event in _iter_jsonl(input_dir / "messages.jsonl"):
         message_count += 1
-        timestamps.append(_parse_timestamp(event["timestamp"], f"messages.jsonl:{line_number}"))
+        ts = _parse_timestamp(event["timestamp"], f"messages.jsonl:{line_number}")
+        timestamps.append(ts)
         all_agents.add(event["agent_id"])
         if event.get("recipient_agent_id"):
             all_agents.add(event["recipient_agent_id"])
@@ -231,6 +233,14 @@ def analyze_dataset(
                 board_participants.add(event["recipient_agent_id"])
             if event["message_type"] == "assignment":
                 assignment_counts[event["agent_id"]] += 1
+                timeline_events.append({
+                    "timestamp": event["timestamp"],
+                    "agent_id": event["agent_id"],
+                    "source": "messages.jsonl",
+                    "line": line_number,
+                    "event_type": "coordinator-assignment",
+                    "detail": f"assigned task to {event.get('recipient_agent_id', '?')}",
+                })
 
     transcripts_by_call: dict[str, list[tuple[int, dict]]] = defaultdict(list)
     for line_number, row in _iter_jsonl(input_dir / "transcripts.jsonl"):
@@ -307,6 +317,48 @@ def analyze_dataset(
                 "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
             })
 
+    finding_tool_call_ids = {item["tool_call_id"]: item for item in findings}
+    for tool_call_id, item in finding_tool_call_ids.items():
+        transcripts = transcripts_by_call.get(tool_call_id, [])
+        controls = controls_by_call.get(tool_call_id, [])
+        ts_str = None
+        agent = None
+        if controls:
+            ts_str = controls[0][1].get("timestamp")
+            agent = controls[0][1].get("agent_id")
+        elif transcripts:
+            ts_str = transcripts[0][1].get("timestamp")
+            agent = transcripts[0][1].get("agent_id")
+        if ts_str:
+            reasons = item["reasons"]
+            detail_parts = []
+            if "tool-name-mismatch" in reasons:
+                detail_parts.append(f"claimed {item.get('claimed_tool')}, executed {item.get('actual_tool')}")
+            if "unbacked-completion" in reasons:
+                detail_parts.append("claimed done but check failed")
+            if "oracle-integrity-violation" in reasons:
+                ctrl = controls[0][1] if controls else {}
+                detail_parts.append(f"modified {ctrl.get('resource', '?')}")
+            if "agent-id-mismatch" in reasons:
+                detail_parts.append("agent identity conflict")
+            if "trace-id-mismatch" in reasons:
+                detail_parts.append("trace ID conflict")
+            if "missing-transcript" in reasons:
+                detail_parts.append("no transcript for control-plane event")
+            if "missing-control-plane-event" in reasons:
+                detail_parts.append("no control-plane event for transcript")
+            timeline_events.append({
+                "timestamp": ts_str,
+                "agent_id": agent or "unknown",
+                "source": "control_plane.jsonl" if controls else "transcripts.jsonl",
+                "line": controls[0][0] if controls else (transcripts[0][0] if transcripts else 0),
+                "event_type": "finding",
+                "finding_id": item["finding_id"],
+                "detail": "; ".join(detail_parts) if detail_parts else ";".join(reasons),
+            })
+
+    timeline_events.sort(key=lambda e: (e["timestamp"], e["agent_id"]))
+
     credential_agents: dict[str, set[str]] = defaultdict(set)
     credential_lines: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for tool_call_id, controls in controls_by_call.items():
@@ -341,6 +393,9 @@ def analyze_dataset(
         item["tool_call_id"] for item in findings
         if "oracle-integrity-violation" in item["reasons"]
     }
+
+    timeline_finding_count = sum(1 for e in timeline_events if e["event_type"] == "finding")
+    timeline_assignment_count = sum(1 for e in timeline_events if e["event_type"] == "coordinator-assignment")
 
     reason_counts = Counter(reason for item in findings for reason in item["reasons"])
     mitre_counts: Counter[str] = Counter()
@@ -381,6 +436,9 @@ def analyze_dataset(
             "shared_credentials": len(shared_credentials),
             "reason_counts": dict(sorted(reason_counts.items())),
             "mitre_technique_counts": dict(sorted(mitre_counts.items())),
+            "timeline_events": len(timeline_events),
+            "timeline_finding_events": timeline_finding_count,
+            "timeline_assignment_events": timeline_assignment_count,
         },
         "method": {
             "authoritative_source": "control_plane.jsonl for executed tool activity",
@@ -439,6 +497,9 @@ def analyze_dataset(
         json.dumps(credential_reuse_records, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "timeline.json").write_text(
+        json.dumps(timeline_events, indent=2, sort_keys=True) + "\n", encoding="utf-8",
+    )
 
     fieldnames = (
         "finding_id", "tool_call_id", "agent_id_transcript", "agent_id_control",
@@ -457,7 +518,7 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    report = _render_report(summary, evidence_manifest)
+    report = _render_report(summary, evidence_manifest, timeline_events)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
 
@@ -480,7 +541,49 @@ Mappings are deterministic: each detection reason maps to a fixed ATT&CK techniq
 """
 
 
-def _render_report(summary: dict, manifest: dict) -> str:
+def _render_timeline(events: list[dict]) -> str:
+    if not events:
+        return ""
+    finding_events = [e for e in events if e["event_type"] == "finding"]
+    assignment_events = [e for e in events if e["event_type"] == "coordinator-assignment"]
+    lines = ["## Timeline", ""]
+    if assignment_events:
+        lines.append(f"### Coordinator assignments ({len(assignment_events):,} events)")
+        lines.append("")
+        shown = assignment_events[:20]
+        for e in shown:
+            ts = e["timestamp"].replace("T", " ").replace("Z", " UTC").rstrip()
+            lines.append(f"- `{ts}` **{e['agent_id']}**: {e['detail']}")
+        if len(assignment_events) > 20:
+            lines.append(f"- ... and {len(assignment_events) - 20:,} more coordinator assignments")
+        lines.append("")
+    if finding_events:
+        lines.append(f"### Finding-linked events ({len(finding_events):,} events)")
+        lines.append("")
+        for e in finding_events:
+            ts = e["timestamp"].replace("T", " ").replace("Z", " UTC").rstrip()
+            fid = e.get("finding_id", "")
+            lines.append(f"- `{ts}` **{e['agent_id']}** [{fid}]: {e['detail']}")
+        lines.append("")
+    hour_buckets: dict[str, int] = {}
+    for e in events:
+        hour = e["timestamp"][:13]
+        hour_buckets[hour] = hour_buckets.get(hour, 0) + 1
+    if len(hour_buckets) > 1:
+        lines.append("### Activity by hour")
+        lines.append("")
+        lines.append("| Hour (UTC) | Events |")
+        lines.append("| --- | ---: |")
+        for hour in sorted(hour_buckets):
+            display = hour.replace("T", " ") + ":00"
+            lines.append(f"| {display} | {hour_buckets[hour]:,} |")
+        lines.append("")
+    lines.append("Full event data is in `timeline.json`.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
     files = "\n".join(
@@ -531,6 +634,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 3. The pipeline reported {findings['record_conflicts']:,} total record conflicts and reconstructed {findings['trajectory_records']:,} source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
+{_render_timeline(timeline_events or [])}
 {_render_mitre_section(findings)}
 {evaluation_section}
 ## Evidence model

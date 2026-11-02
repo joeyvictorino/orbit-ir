@@ -231,6 +231,45 @@ class LabTest(unittest.TestCase):
             self.assertIn("T1565", report_text)
             self.assertIn("Masquerading", report_text)
 
+    def test_timeline_appears_in_report_and_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3,
+                unbacked_completions=5, oracle_modifications=3, seed=17,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertGreater(summary["findings"]["timeline_events"], 0)
+            self.assertGreater(summary["findings"]["timeline_finding_events"], 0)
+            self.assertGreater(summary["findings"]["timeline_assignment_events"], 0)
+
+            timeline = json.loads((root / "results" / "timeline.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(timeline, list)
+            self.assertGreater(len(timeline), 0)
+            timestamps = [e["timestamp"] for e in timeline]
+            self.assertEqual(timestamps, sorted(timestamps))
+            event_types = {e["event_type"] for e in timeline}
+            self.assertIn("finding", event_types)
+            self.assertIn("coordinator-assignment", event_types)
+            for event in timeline:
+                self.assertIn("timestamp", event)
+                self.assertIn("agent_id", event)
+                self.assertIn("source", event)
+                self.assertIn("event_type", event)
+                self.assertIn("detail", event)
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Timeline", report_text)
+            self.assertIn("### Finding-linked events", report_text)
+            self.assertIn("### Coordinator assignments", report_text)
+            self.assertIn("### Activity by hour", report_text)
+            self.assertIn("timeline.json", report_text)
+
     def test_mitre_deduplication_per_finding(self) -> None:
         from orbit_ir.analyzer import _mitre_for_reasons
         techniques = _mitre_for_reasons(["tool-name-mismatch", "argument-digest-mismatch"])
