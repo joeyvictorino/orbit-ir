@@ -154,6 +154,7 @@ from .agent_collusion import analyze as analyze_agent_collusion, format_text as 
 from .evidence_replay import analyze as analyze_evidence_replay, format_text as format_ereplay_text, format_json as format_ereplay_json
 from .anomaly_correlate import analyze as analyze_anomaly_correlate, format_text as format_acorr_text, format_json as format_acorr_json
 from .policy_enforce import analyze as analyze_policy_enforce, format_text as format_penforce_text, format_json as format_penforce_json
+from .signal_noise import analyze as analyze_signal_noise, format_text as format_signoise_text, format_json as format_signoise_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1053,6 +1054,11 @@ def build_parser() -> argparse.ArgumentParser:
     penforce_p.add_argument("--policy", type=Path, required=True, help="Path to policy rules JSON file")
     penforce_p.add_argument("--format", choices=["text", "json"], default="text")
     penforce_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    signoise_p = subparsers.add_parser("signal-noise", help="Separate high-signal anomaly events from noise")
+    signoise_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    signoise_p.add_argument("--format", choices=["text", "json"], default="text")
+    signoise_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2999,6 +3005,19 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Policy enforcement report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "signal-noise":
+        report = analyze_signal_noise(args.evidence_dir)
+        if args.format == "json":
+            output = format_signoise_json(report)
+        else:
+            output = format_signoise_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Signal-noise analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
