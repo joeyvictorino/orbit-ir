@@ -182,6 +182,8 @@ from .auth_bypass import analyze_auth_bypass, format_text as format_ab_text, for
 from .resource_leak import analyze_resource_leaks, format_text as format_rl_text, format_json as format_rl_json, _load_events as _load_rl_events
 from .role_impersonation import analyze_role_impersonation, format_text as format_ri_text, format_json as format_ri_json, _load_events as _load_ri_events
 from .token_smuggle import analyze_token_smuggling, format_text as format_ts_text, format_json as format_ts_json, _load_events as _load_ts_events
+from .memory_tampering import analyze_memory_tampering, format_text as format_memtamp_text, format_json as format_memtamp_json, _load_events as _load_memtamp_events
+from .trust_escalation import analyze_trust_escalation, format_text as format_tescal_text, format_json as format_tescal_json, _load_events as _load_tescal_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1251,6 +1253,16 @@ def build_parser() -> argparse.ArgumentParser:
     cd_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     cd_p.add_argument("--format", choices=["text", "json"], default="text")
     cd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    mt_p = subparsers.add_parser("memory-tamper", help="Detect agent memory/context tampering patterns")
+    mt_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    mt_p.add_argument("--format", choices=["text", "json"], default="text")
+    mt_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    te_p = subparsers.add_parser("trust-escalation", help="Detect trust boundary escalation patterns")
+    te_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    te_p.add_argument("--format", choices=["text", "json"], default="text")
+    te_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3714,6 +3726,46 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Config drift analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "memory-tamper":
+        from orbit_ir.memory_tampering import (
+            analyze_memory_tampering,
+            format_json as format_memtamp_json,
+            format_text as format_memtamp_text,
+        )
+        from orbit_ir.memory_tampering import _load_events as _load_memtamp_events
+        events = _load_memtamp_events(str(args.evidence_dir))
+        report = analyze_memory_tampering(events)
+        if args.format == "json":
+            output = format_memtamp_json(report)
+        else:
+            output = format_memtamp_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Memory tampering analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "trust-escalation":
+        from orbit_ir.trust_escalation import (
+            analyze_trust_escalation,
+            format_json as format_tescal_json,
+            format_text as format_tescal_text,
+        )
+        from orbit_ir.trust_escalation import _load_events as _load_tescal_events
+        events = _load_tescal_events(str(args.evidence_dir))
+        report = analyze_trust_escalation(events)
+        if args.format == "json":
+            output = format_tescal_json(report)
+        else:
+            output = format_tescal_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Trust escalation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
