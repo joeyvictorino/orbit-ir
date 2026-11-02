@@ -167,6 +167,8 @@ from .config_tamper import analyze_config_tamper, format_text as format_ct_text,
 from .model_theft import analyze_model_theft, format_text as format_mt_text, format_json as format_mt_json, _load_events as _load_mt_events
 from .token_exfil import analyze_token_exfil, format_text as format_te_text, format_json as format_te_json, _load_events as _load_te_events
 from .replay_attack import analyze_replay_attack, format_text as format_ra_text, format_json as format_ra_json, _load_events as _load_ra_events
+from .model_poisoning import analyze_model_poisoning, format_text as format_mp_text, format_json as format_mp_json, _load_events as _load_mp_events
+from .identity_spoof import analyze_identity_spoof, format_text as format_is_text, format_json as format_is_json, _load_events as _load_is_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1131,6 +1133,16 @@ def build_parser() -> argparse.ArgumentParser:
     ra_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     ra_p.add_argument("--format", choices=["text", "json"], default="text")
     ra_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    mp_p = subparsers.add_parser("model-poisoning", help="Detect model poisoning and backdoor patterns")
+    mp_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    mp_p.add_argument("--format", choices=["text", "json"], default="text")
+    mp_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    is_p = subparsers.add_parser("identity-spoof", help="Detect agent identity spoofing patterns")
+    is_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    is_p.add_argument("--format", choices=["text", "json"], default="text")
+    is_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3262,6 +3274,32 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Replay attack analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "model-poisoning":
+        report = analyze_model_poisoning(args.evidence_dir)
+        if args.format == "json":
+            output = format_mp_json(report)
+        else:
+            output = format_mp_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Model poisoning analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "identity-spoof":
+        report = analyze_identity_spoof(args.evidence_dir)
+        if args.format == "json":
+            output = format_is_json(report)
+        else:
+            output = format_is_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Identity spoof analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
