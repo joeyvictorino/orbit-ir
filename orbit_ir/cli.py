@@ -109,6 +109,10 @@ from .persistence_detect import analyze_persistence, format_text as format_persi
 from .defense_evasion import analyze_defense_evasion, format_text as format_evasion_text, format_json as format_evasion_json, _load_events as _load_evasion_events
 from .lateral_path import analyze_lateral, format_text as format_lateral_text, format_json as format_lateral_json, _load_events as _load_lateral_events
 from .credential_harvest import analyze_harvest, format_text as format_harvest_text, format_json as format_harvest_json, _load_events as _load_harvest_events
+from .tool_abuse import analyze_tool_abuse, format_text as format_abuse_text, format_json as format_abuse_json, _load_events as _load_abuse_events
+from .data_staging import analyze_staging, format_text as format_staging_text, format_json as format_staging_json, _load_events as _load_staging_events
+from .privilege_abuse import analyze_privilege_abuse, format_text as format_privabuse_text, format_json as format_privabuse_json, _load_events as _load_privabuse_events
+from .tool_misuse import analyze_tool_misuse, format_text as format_toolmisuse_text, format_json as format_toolmisuse_json, _load_events as _load_toolmisuse_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -760,6 +764,26 @@ def build_parser() -> argparse.ArgumentParser:
     harvest_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     harvest_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     harvest_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    abuse_p = subparsers.add_parser("tool-abuse", help="Detect tool misuse patterns and parameter injection")
+    abuse_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    abuse_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    abuse_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    staging_p = subparsers.add_parser("data-staging", help="Detect data staging patterns in preparation for exfiltration")
+    staging_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    staging_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    staging_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    privabuse_p = subparsers.add_parser("privilege-abuse", help="Detect privilege abuse patterns in agent behavior")
+    privabuse_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    privabuse_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    privabuse_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    toolmisuse_p = subparsers.add_parser("tool-misuse", help="Classify tool misuse patterns and build agent tool profiles")
+    toolmisuse_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    toolmisuse_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    toolmisuse_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2071,6 +2095,62 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Credential harvest report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "tool-abuse":
+        evidence_events = _load_abuse_events(args.evidence_dir)
+        report = analyze_tool_abuse(evidence_events)
+        if args.format == "json":
+            output = format_abuse_json(report)
+        else:
+            output = format_abuse_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Tool abuse report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "data-staging":
+        evidence_events = _load_staging_events(args.evidence_dir)
+        report = analyze_staging(evidence_events)
+        if args.format == "json":
+            output = format_staging_json(report)
+        else:
+            output = format_staging_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Data staging report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "privilege-abuse":
+        evidence_events = _load_privabuse_events(args.evidence_dir)
+        report = analyze_privilege_abuse(evidence_events)
+        if args.format == "json":
+            output = format_privabuse_json(report)
+        else:
+            output = format_privabuse_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Privilege abuse report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "tool-misuse":
+        evidence_events = _load_toolmisuse_events(args.evidence_dir)
+        report = analyze_tool_misuse(evidence_events)
+        if args.format == "json":
+            output = format_toolmisuse_json(report)
+        else:
+            output = format_toolmisuse_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Tool misuse report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
