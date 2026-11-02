@@ -583,9 +583,64 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    report = _render_report(summary, evidence_manifest, timeline_events, data_quality)
+    report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
+
+
+def _render_trajectory_graph(trajectories: list[dict]) -> str:
+    if not trajectories:
+        return ""
+    lines = ["## Agent trajectory graph", "", "```mermaid", "flowchart LR"]
+    agents: dict[str, list[dict]] = {}
+    for traj in trajectories:
+        path = traj.get("path", [])
+        agent_node = next((n for n in path if n["type"] == "agent"), None)
+        if agent_node:
+            agents.setdefault(agent_node["id"], []).append(traj)
+    node_counter = 0
+    confidence_styles: dict[str, str] = {}
+    for agent_id in sorted(agents):
+        trajs = agents[agent_id]
+        safe_agent = agent_id.replace("-", "_").replace(".", "_")
+        lines.append(f"    subgraph {safe_agent}[\"{agent_id}\"]")
+        for traj in trajs:
+            path = traj.get("path", [])
+            confidence = traj.get("confidence", "low")
+            tool_node = next((n for n in path if n["type"] == "tool_call"), None)
+            resource_node = next((n for n in path if n["type"] == "resource"), None)
+            effect_node = next((n for n in path if n["type"] == "effect"), None)
+            decision_node = next((n for n in path if n["type"] == "control_decision"), None)
+            if not tool_node:
+                continue
+            tid = f"n{node_counter}"; node_counter += 1
+            rid = f"n{node_counter}"; node_counter += 1
+            eid = f"n{node_counter}"; node_counter += 1
+            tool_label = tool_node["id"][:30]
+            res_label = (resource_node["id"] if resource_node else "?")[:30]
+            eff_label = (effect_node["id"] if effect_node else "?")[:20]
+            dec_label = (decision_node["id"] if decision_node else "?")[:10]
+            lines.append(f"        {tid}[\"{tool_label}\"] --> {rid}[\"{res_label}\"]")
+            lines.append(f"        {rid} --> {eid}[\"{eff_label} / {dec_label}\"]")
+            confidence_styles[tid] = confidence
+            confidence_styles[eid] = confidence
+        lines.append("    end")
+    high_nodes = [k for k, v in confidence_styles.items() if v == "high"]
+    med_nodes = [k for k, v in confidence_styles.items() if v == "medium"]
+    low_nodes = [k for k, v in confidence_styles.items() if v == "low"]
+    if high_nodes:
+        lines.append(f"    style {','.join(high_nodes)} fill:#d32f2f,color:#fff")
+    if med_nodes:
+        lines.append(f"    style {','.join(med_nodes)} fill:#f57c00,color:#fff")
+    if low_nodes:
+        lines.append(f"    style {','.join(low_nodes)} fill:#757575,color:#fff")
+    lines.append("```")
+    lines.append("")
+    lines.append(f"{len(trajectories):,} trajectories across {len(agents):,} agents. "
+                 "Red = high confidence, orange = medium, grey = low. "
+                 "Full trajectory data is in `trajectories.json`.")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _render_mitre_section(findings_summary: dict) -> str:
@@ -712,7 +767,7 @@ def _render_statistics_table(findings_summary: dict) -> str:
     return "\n".join(lines)
 
 
-def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None) -> str:
+def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None, trajectories: list[dict] | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
     files = "\n".join(
@@ -766,6 +821,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 
 {_render_statistics_table(findings)}
 {_render_timeline(timeline_events or [])}
+{_render_trajectory_graph(trajectories or [])}
 {_render_mitre_section(findings)}
 {_render_data_quality(data_quality or {})}
 {evaluation_section}

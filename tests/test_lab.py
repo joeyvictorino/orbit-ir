@@ -429,6 +429,40 @@ class LabTest(unittest.TestCase):
             self.assertIn("### By confidence band", report)
             self.assertIn("Average confidence score:", report)
 
+    def test_trajectory_graph_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Agent trajectory graph", report)
+            self.assertIn("```mermaid", report)
+            self.assertIn("flowchart LR", report)
+            self.assertIn("subgraph", report)
+            self.assertIn("trajectories.json", report)
+
+            trajectories = json.loads((results_dir / "trajectories.json").read_text())
+            self.assertGreater(len(trajectories), 0)
+            agents_in_graph = set()
+            for t in trajectories:
+                for node in t["path"]:
+                    if node["type"] == "agent":
+                        agents_in_graph.add(node["id"])
+            for agent_id in agents_in_graph:
+                self.assertIn(agent_id, report)
+
+    def test_trajectory_graph_empty_when_no_trajectories(self) -> None:
+        from orbit_ir.analyzer import _render_trajectory_graph
+        self.assertEqual(_render_trajectory_graph([]), "")
+
     def test_confidence_score_in_csv(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
