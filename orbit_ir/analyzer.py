@@ -625,6 +625,58 @@ def analyze_dataset(
     return summary
 
 
+def verify_evidence(
+    input_dir: Path,
+    manifest_path: Path | None = None,
+) -> dict:
+    """Verify evidence files against a SHA-256 manifest.
+
+    Returns a dict with a ``files`` list.  Each entry has ``name``,
+    ``status`` (``ok``, ``mismatch``, ``missing``, ``extra``), and
+    ``detail``.
+    """
+    if manifest_path is None:
+        candidate = input_dir.parent / "results" / "evidence_manifest.json"
+        if candidate.is_file():
+            manifest_path = candidate
+
+    if manifest_path is not None and manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected = {f["name"]: f for f in manifest["files"]}
+    else:
+        expected = {name: None for name in EVIDENCE_FILES}
+
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for name in sorted(expected):
+        seen.add(name)
+        path = input_dir / name
+        if not path.is_file():
+            results.append({"name": name, "status": "missing", "detail": "file not found"})
+            continue
+        actual_hash = _sha256(path)
+        actual_size = path.stat().st_size
+        exp = expected[name]
+        if exp is not None and exp.get("sha256"):
+            if actual_hash == exp["sha256"]:
+                results.append({"name": name, "status": "ok", "detail": f"sha256={actual_hash[:16]}... ({actual_size:,} bytes)"})
+            else:
+                results.append({
+                    "name": name,
+                    "status": "mismatch",
+                    "detail": f"expected sha256={exp['sha256'][:16]}..., got {actual_hash[:16]}...",
+                })
+        else:
+            results.append({"name": name, "status": "ok", "detail": f"sha256={actual_hash[:16]}... ({actual_size:,} bytes, no manifest to compare)"})
+
+    for child in sorted(input_dir.iterdir()):
+        if child.name not in seen and child.is_file() and child.suffix == ".jsonl":
+            results.append({"name": child.name, "status": "extra", "detail": "not in manifest"})
+
+    return {"files": results}
+
+
 def _render_trajectory_graph(trajectories: list[dict]) -> str:
     if not trajectories:
         return ""
