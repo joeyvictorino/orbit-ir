@@ -1,229 +1,65 @@
-"""Reproducibility audit for evidence datasets.
-
-Hashes each evidence file, verifies completeness, and cross-checks
-agent references across sources.
-"""
-
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
 
-EVIDENCE_FILES = ("messages.jsonl", "transcripts.jsonl", "control_plane.jsonl")
-OPTIONAL_FILES = ("ground_truth.json",)
+from .analyzer import analyze_dataset
 
 
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def _hash_findings(findings: list[dict]) -> str:
+    canonical = json.dumps(findings, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _read_jsonl(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    rows: list[dict] = []
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return rows
+def audit_reproducibility(
+    evidence_dir: Path,
+    reference_dir: Path,
+    *,
+    work_dir: Path,
+) -> dict:
+    ref_findings_path = reference_dir / "findings.json"
+    if not ref_findings_path.exists():
+        raise FileNotFoundError(f"reference findings not found: {ref_findings_path}")
 
+    ref_findings = json.loads(ref_findings_path.read_text(encoding="utf-8"))
+    ref_hash = _hash_findings(ref_findings)
 
-def audit_evidence(input_dir: Path) -> dict:
-    """Run a reproducibility audit on the evidence in *input_dir*.
+    ground_truth = evidence_dir / "ground_truth.json"
+    gt_path = ground_truth if ground_truth.exists() else None
+    analyze_dataset(evidence_dir, work_dir, ground_truth_path=gt_path)
 
-    Returns a JSON-serialisable report with file hashes, row counts,
-    cross-reference checks, and an overall pass/fail verdict.
-    """
-    input_dir = Path(input_dir)
-    if not input_dir.is_dir():
-        raise FileNotFoundError(f"not a directory: {input_dir}")
+    new_findings_path = work_dir / "findings.json"
+    new_findings = json.loads(new_findings_path.read_text(encoding="utf-8"))
+    new_hash = _hash_findings(new_findings)
 
-    files: list[dict] = []
-    checks: list[dict] = []
-    passed = True
+    reproducible = ref_hash == new_hash
 
-    for name in EVIDENCE_FILES:
-        path = input_dir / name
-        if not path.exists():
-            files.append({
-                "name": name,
-                "present": False,
-                "sha256": None,
-                "bytes": 0,
-                "rows": 0,
-            })
-            passed = False
-            checks.append({
-                "check": f"{name}_exists",
-                "passed": False,
-                "detail": f"{name} is missing",
-            })
-            continue
-
-        size = path.stat().st_size
-        sha = _sha256(path)
-        rows = _read_jsonl(path)
-        files.append({
-            "name": name,
-            "present": True,
-            "sha256": sha,
-            "bytes": size,
-            "rows": len(rows),
-        })
-        checks.append({
-            "check": f"{name}_exists",
-            "passed": True,
-            "detail": f"{name} present ({len(rows)} rows, {size} bytes)",
-        })
-
-        if size == 0:
-            checks.append({
-                "check": f"{name}_nonempty",
-                "passed": False,
-                "detail": f"{name} is empty",
-            })
-            passed = False
-        else:
-            checks.append({
-                "check": f"{name}_nonempty",
-                "passed": True,
-                "detail": f"{name} has {len(rows)} rows",
-            })
-
-    for name in OPTIONAL_FILES:
-        path = input_dir / name
-        if path.exists():
-            sha = _sha256(path)
-            size = path.stat().st_size
-            files.append({
-                "name": name,
-                "present": True,
-                "sha256": sha,
-                "bytes": size,
-                "rows": None,
-            })
-        else:
-            files.append({
-                "name": name,
-                "present": False,
-                "sha256": None,
-                "bytes": 0,
-                "rows": None,
-            })
-
-    messages = _read_jsonl(input_dir / "messages.jsonl")
-    transcripts = _read_jsonl(input_dir / "transcripts.jsonl")
-    control = _read_jsonl(input_dir / "control_plane.jsonl")
-
-    msg_agents: set[str] = set()
-    for row in messages:
-        if "agent_id" in row:
-            msg_agents.add(row["agent_id"])
-        if row.get("recipient_agent_id"):
-            msg_agents.add(row["recipient_agent_id"])
-
-    tx_agents: set[str] = set()
-    for row in transcripts:
-        if "agent_id" in row:
-            tx_agents.add(row["agent_id"])
-
-    cp_agents: set[str] = set()
-    for row in control:
-        if "agent_id" in row:
-            cp_agents.add(row["agent_id"])
-
-    all_agents = msg_agents | tx_agents | cp_agents
-
-    if messages and transcripts:
-        tx_only = tx_agents - msg_agents
-        if tx_only:
-            checks.append({
-                "check": "transcript_agents_in_messages",
-                "passed": False,
-                "detail": f"{len(tx_only)} transcript agent(s) not in messages: {sorted(tx_only)[:5]}",
-            })
-            passed = False
-        else:
-            checks.append({
-                "check": "transcript_agents_in_messages",
-                "passed": True,
-                "detail": "all transcript agents appear in messages",
-            })
-
-    if messages and control:
-        cp_only = cp_agents - msg_agents
-        if cp_only:
-            checks.append({
-                "check": "control_plane_agents_in_messages",
-                "passed": False,
-                "detail": f"{len(cp_only)} control-plane agent(s) not in messages: {sorted(cp_only)[:5]}",
-            })
-            passed = False
-        else:
-            checks.append({
-                "check": "control_plane_agents_in_messages",
-                "passed": True,
-                "detail": "all control-plane agents appear in messages",
-            })
-
-    msg_ids: list[str] = [r.get("event_id", "") for r in messages if r.get("event_id")]
-    if msg_ids and len(msg_ids) != len(set(msg_ids)):
-        dup_count = len(msg_ids) - len(set(msg_ids))
-        checks.append({
-            "check": "message_ids_unique",
-            "passed": False,
-            "detail": f"{dup_count} duplicate event_id(s) in messages",
-        })
-        passed = False
-    elif msg_ids:
-        checks.append({
-            "check": "message_ids_unique",
-            "passed": True,
-            "detail": f"all {len(msg_ids)} message event_ids are unique",
-        })
+    ref_types = {f.get("detection_type", "") for f in ref_findings}
+    new_types = {f.get("detection_type", "") for f in new_findings}
+    added_types = sorted(new_types - ref_types)
+    removed_types = sorted(ref_types - new_types)
 
     return {
-        "directory": str(input_dir),
-        "passed": passed,
-        "files": files,
-        "checks": checks,
-        "agents": len(all_agents),
-        "total_rows": sum(f["rows"] for f in files if f["rows"] is not None),
+        "reproducible": reproducible,
+        "reference_hash": ref_hash,
+        "rerun_hash": new_hash,
+        "reference_count": len(ref_findings),
+        "rerun_count": len(new_findings),
+        "added_detection_types": added_types,
+        "removed_detection_types": removed_types,
     }
 
 
-def format_audit_text(report: dict) -> str:
-    """Human-readable audit report."""
-    verdict = "PASS" if report["passed"] else "FAIL"
+def format_audit_text(result: dict) -> str:
+    status = "REPRODUCIBLE" if result["reproducible"] else "DIVERGED"
     lines = [
-        f"Audit: {report['directory']}",
-        f"  Verdict: {verdict}",
-        f"  Agents:  {report['agents']}",
-        f"  Rows:    {report['total_rows']}",
-        "",
-        "  Files:",
+        f"Audit: {status}",
+        f"  Reference: {result['reference_count']} findings (hash: {result['reference_hash'][:12]}...)",
+        f"  Rerun:     {result['rerun_count']} findings (hash: {result['rerun_hash'][:12]}...)",
     ]
-    for f in report["files"]:
-        if f["present"]:
-            rows_str = f"  {f['rows']} rows" if f["rows"] is not None else ""
-            lines.append(f"    [OK]   {f['name']}: sha256={f['sha256'][:16]}...{rows_str}")
-        else:
-            lines.append(f"    [MISS] {f['name']}")
-
-    lines.append("")
-    lines.append("  Checks:")
-    for c in report["checks"]:
-        mark = "PASS" if c["passed"] else "FAIL"
-        lines.append(f"    [{mark}] {c['check']}: {c['detail']}")
-
+    if result["added_detection_types"]:
+        lines.append(f"  New types:     {', '.join(result['added_detection_types'])}")
+    if result["removed_detection_types"]:
+        lines.append(f"  Missing types: {', '.join(result['removed_detection_types'])}")
     return "\n".join(lines) + "\n"

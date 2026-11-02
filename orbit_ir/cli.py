@@ -29,7 +29,7 @@ from .fingerprint import fingerprint_agents, format_fingerprint_text
 from .scope import apply_scope
 from .summary import build_executive_summary, format_summary_text
 from .dedup import deduplicate_findings, format_dedup_summary
-from .audit import audit_evidence, format_audit_text
+from .audit import audit_reproducibility, format_audit_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -181,8 +181,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Dedup strategy: exact (same type+agent+reasons) or fuzzy (same type+agent)")
     dedup.add_argument("--format", choices=["json", "text"], default="json", help="Output format for summary")
 
-    aud = subparsers.add_parser("audit", help="Reproducibility audit: hash evidence, verify completeness, cross-check agents")
+    aud = subparsers.add_parser("audit", help="Reproducibility audit: re-analyze evidence and compare to a reference run")
     aud.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    aud.add_argument("--reference", type=Path, required=True, help="Previous results directory (must contain findings.json)")
+    aud.add_argument("--work-dir", type=Path, default=None, help="Work directory for re-analysis (default: temp)")
     aud.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
@@ -312,12 +314,14 @@ def _run(args: argparse.Namespace) -> None:
             print(summary_text, end="")
         return
     elif args.command == "audit":
-        report = audit_evidence(args.input)
+        import tempfile
+        work = args.work_dir or Path(tempfile.mkdtemp(prefix="orbit-audit-"))
+        report = audit_reproducibility(args.input, args.reference, work_dir=work)
         if args.format == "json":
             print(json.dumps(report, sort_keys=True, indent=2))
         else:
             print(format_audit_text(report), end="")
-        if not report["passed"]:
+        if not report["reproducible"]:
             raise SystemExit(1)
         return
     elif args.command == "scope":
