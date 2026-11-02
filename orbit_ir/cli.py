@@ -89,6 +89,8 @@ from .kill_chain import load_and_analyze as load_and_analyze_kill_chain, format_
 from .impact import analyze_impact, format_impact_text
 from .counterfactual import analyze_counterfactual, format_counterfactual_text
 from .privesc import analyze_privilege_escalation, format_text as format_privesc_text, format_json as format_privesc_json
+from .data_flow import analyze_data_flow, format_data_flow_text
+from .compliance_check import check_compliance, format_compliance_text, list_frameworks
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -622,6 +624,19 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     pe.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     pe.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    df = subparsers.add_parser("data-flow", help="Trace data flows through agent interactions")
+    df.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    df.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    df.add_argument("--sensitivity-threshold", choices=["low", "medium", "high"], default="medium", help="Minimum sensitivity for exfiltration alerts")
+    df.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cc = subparsers.add_parser("compliance-check", help="Evaluate evidence against compliance framework controls")
+    cc.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cc.add_argument("--framework", choices=["nist", "soc2", "iso27001"], default="nist", help="Compliance framework")
+    cc.add_argument("--rules", type=Path, default=None, help="Custom rules YAML/JSON file")
+    cc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cc.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1614,6 +1629,39 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Privilege escalation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "data-flow":
+        result = analyze_data_flow(
+            args.evidence_dir,
+            sensitivity_threshold=args.sensitivity_threshold,
+        )
+        if args.format == "json":
+            output = json.dumps(result, sort_keys=True, indent=2)
+        else:
+            output = format_data_flow_text(result)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Data flow analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "compliance-check":
+        result = check_compliance(
+            args.evidence_dir,
+            framework=args.framework,
+            custom_rules_path=args.rules,
+        )
+        if args.format == "json":
+            output = json.dumps(result, sort_keys=True, indent=2)
+        else:
+            output = format_compliance_text(result)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Compliance check written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
