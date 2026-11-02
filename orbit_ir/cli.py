@@ -85,6 +85,7 @@ from .ingest import EvidenceIngester, format_ingest_text
 from .report_template import TemplateReporter, list_templates, show_template, format_template_list
 from .attribution import load_and_attribute, format_attribution_text, summarize_attributions
 from .diff_timeline import load_and_diff, format_diff_text as format_diff_timeline_text
+from .kill_chain import load_and_analyze as load_and_analyze_kill_chain, format_kill_chain_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -595,6 +596,11 @@ def build_parser() -> argparse.ArgumentParser:
     dtl.add_argument("--match-keys", type=str, default=None, help="Comma-separated keys for event matching")
     dtl.add_argument("--threshold", type=float, default=60.0, help="Timing shift detection threshold in seconds")
     dtl.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    kc = subparsers.add_parser("kill-chain", help="Score kill chain completeness and detect coverage gaps")
+    kc.add_argument("--path", type=Path, required=True, help="Evidence file or directory to analyze")
+    kc.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    kc.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1525,6 +1531,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Timeline diff written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "kill-chain":
+        report = load_and_analyze_kill_chain(str(args.path))
+        if args.format == "json":
+            from dataclasses import asdict
+            output = json.dumps(asdict(report), sort_keys=True, indent=2)
+        else:
+            output = format_kill_chain_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Kill chain analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
