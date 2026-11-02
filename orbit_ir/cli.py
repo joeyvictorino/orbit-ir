@@ -16,9 +16,11 @@ from .analyzer import (
 from .stats import evidence_stats, format_stats_text
 from .diff import diff_results, format_diff_text
 from .comm_graph import load_and_build as load_comm_graph, format_dot as format_comm_dot, format_summary as format_comm_summary
+from .heatmap import load_and_build_heatmap, format_heatmap_summary
 from .generator import LabConfig, generate_dataset
 from .schema import schema_json
 from .timeline import build_timeline, format_json as format_timeline_json, format_text as format_timeline_text
+from .cef import findings_to_cef
 from .validate import validate_evidence
 from .merge import merge_evidence
 from .fingerprint import fingerprint_agents, format_fingerprint_text
@@ -49,9 +51,9 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--coordinator-min-assignments", type=int, default=2)
     analyze.add_argument(
         "--format",
-        choices=["json", "sarif", "html", "csv"],
+        choices=["json", "sarif", "html", "csv", "cef"],
         default="json",
-        help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0, html prints the HTML report, csv prints findings CSV",
+        help="Output format: json (default) prints the summary, sarif prints SARIF 2.1.0, html prints the HTML report, csv prints findings CSV, cef prints CEF for SIEM ingestion",
     )
     analyze.add_argument(
         "--min-confidence",
@@ -292,6 +294,13 @@ def _run(args: argparse.Namespace) -> None:
         elif args.format == "csv":
             csv_path = args.out / "findings.csv"
             print(csv_path.read_text(encoding="utf-8"), end="")
+        elif args.format == "cef":
+            findings_path = args.out / "findings.json"
+            cef_findings = json.loads(findings_path.read_text(encoding="utf-8"))
+            cef_text = findings_to_cef(cef_findings)
+            cef_path = args.out / "findings.cef"
+            cef_path.write_text(cef_text, encoding="utf-8")
+            print(cef_text, end="")
         else:
             print(json.dumps(summary, sort_keys=True))
     else:
