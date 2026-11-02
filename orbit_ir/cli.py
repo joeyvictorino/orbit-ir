@@ -30,6 +30,8 @@ from .scope import apply_scope
 from .summary import build_executive_summary, format_summary_text
 from .dedup import deduplicate_findings, format_dedup_summary
 from .audit import audit_reproducibility, format_audit_text
+from .bundle import create_bundle, format_bundle_text
+from .compare_agents import compare_agents, format_comparison_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -187,6 +189,18 @@ def build_parser() -> argparse.ArgumentParser:
     aud.add_argument("--work-dir", type=Path, default=None, help="Work directory for re-analysis (default: temp)")
     aud.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
 
+    bun = subparsers.add_parser("bundle", help="Package evidence into a portable zip bundle with manifest")
+    bun.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    bun.add_argument("--output", type=Path, required=True, help="Output zip file path")
+    bun.add_argument("--include-analysis", action="store_true", default=False,
+                     help="Run analysis and include results in the bundle")
+
+    cmp = subparsers.add_parser("compare", help="Side-by-side comparison of two agents' behavior")
+    cmp.add_argument("--input", type=Path, required=True, help="Evidence directory")
+    cmp.add_argument("--agent-a", required=True, help="First agent ID")
+    cmp.add_argument("--agent-b", required=True, help="Second agent ID")
+    cmp.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -333,6 +347,17 @@ def _run(args: argparse.Namespace) -> None:
             agents=agents_list, sources=sources_list,
         )
         print(json.dumps(result, sort_keys=True, indent=2))
+        return
+    elif args.command == "bundle":
+        result = create_bundle(args.input, args.output, include_analysis=args.include_analysis)
+        print(format_bundle_text(result), end="")
+        return
+    elif args.command == "compare":
+        result = compare_agents(args.input, args.agent_a, args.agent_b)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_comparison_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
