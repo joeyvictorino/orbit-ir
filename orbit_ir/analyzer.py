@@ -481,8 +481,31 @@ def analyze_dataset(
     (output_dir / "coordinator_ranking.json").write_text(
         json.dumps(coordinator_ranking, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    missing_transcript_ids = sorted(
+        tcid for tcid, items in controls_by_call.items()
+        if tcid not in transcripts_by_call
+    )
+    missing_control_ids = sorted(
+        tcid for tcid, items in transcripts_by_call.items()
+        if tcid not in controls_by_call
+    )
+    duplicate_transcript_ids = sorted(
+        tcid for tcid, items in transcripts_by_call.items()
+        if len(items) > 1
+    )
+    duplicate_control_ids = sorted(
+        tcid for tcid, items in controls_by_call.items()
+        if len(items) > 1
+    )
+    data_quality = {
+        "duplicate_message_ids": duplicate_message_ids,
+        "missing_transcript_ids": missing_transcript_ids,
+        "missing_control_plane_ids": missing_control_ids,
+        "duplicate_transcript_tool_call_ids": duplicate_transcript_ids,
+        "duplicate_control_tool_call_ids": duplicate_control_ids,
+    }
     (output_dir / "data_quality.json").write_text(
-        json.dumps({"duplicate_message_ids": duplicate_message_ids}, indent=2, sort_keys=True) + "\n",
+        json.dumps(data_quality, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     credential_reuse_records = [
@@ -518,7 +541,7 @@ def analyze_dataset(
             )
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    report = _render_report(summary, evidence_manifest, timeline_events)
+    report = _render_report(summary, evidence_manifest, timeline_events, data_quality)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     return summary
 
@@ -583,7 +606,37 @@ def _render_timeline(events: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None) -> str:
+def _render_data_quality(data_quality: dict) -> str:
+    dup_msgs = len(data_quality.get("duplicate_message_ids", []))
+    missing_tx = len(data_quality.get("missing_transcript_ids", []))
+    missing_cp = len(data_quality.get("missing_control_plane_ids", []))
+    dup_tx = len(data_quality.get("duplicate_transcript_tool_call_ids", []))
+    dup_cp = len(data_quality.get("duplicate_control_tool_call_ids", []))
+    total = dup_msgs + missing_tx + missing_cp + dup_tx + dup_cp
+    if total == 0:
+        return "## Data quality\n\nNo duplicate IDs, missing records, or duplicate tool-call IDs detected.\n"
+    rows = []
+    if dup_msgs:
+        rows.append(f"| Duplicate message IDs | {dup_msgs:,} |")
+    if missing_tx:
+        rows.append(f"| Missing transcript records | {missing_tx:,} |")
+    if missing_cp:
+        rows.append(f"| Missing control-plane records | {missing_cp:,} |")
+    if dup_tx:
+        rows.append(f"| Duplicate transcript tool-call IDs | {dup_tx:,} |")
+    if dup_cp:
+        rows.append(f"| Duplicate control-plane tool-call IDs | {dup_cp:,} |")
+    return f"""## Data quality
+
+| Check | Count |
+| --- | ---: |
+{chr(10).join(rows)}
+
+{total:,} total data-quality issue(s). Full details are in `data_quality.json`.
+"""
+
+
+def _render_report(summary: dict, manifest: dict, timeline_events: list[dict] | None = None, data_quality: dict | None = None) -> str:
     corpus = summary["corpus"]
     findings = summary["findings"]
     files = "\n".join(
@@ -636,6 +689,7 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 
 {_render_timeline(timeline_events or [])}
 {_render_mitre_section(findings)}
+{_render_data_quality(data_quality or {})}
 {evaluation_section}
 ## Evidence model
 

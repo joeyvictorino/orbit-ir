@@ -270,6 +270,46 @@ class LabTest(unittest.TestCase):
             self.assertIn("### Activity by hour", report_text)
             self.assertIn("timeline.json", report_text)
 
+    def test_data_quality_section_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            transcript_path = root / "evidence" / "transcripts.jsonl"
+            rows = transcript_path.read_text(encoding="utf-8").splitlines()
+            transcript_path.write_text("\n".join(rows[1:]) + "\n", encoding="utf-8")
+
+            summary = analyze_dataset(root / "evidence", root / "results")
+            dq = json.loads((root / "results" / "data_quality.json").read_text(encoding="utf-8"))
+            self.assertIn("missing_transcript_ids", dq)
+            self.assertIn("missing_control_plane_ids", dq)
+            self.assertIn("duplicate_transcript_tool_call_ids", dq)
+            self.assertIn("duplicate_control_tool_call_ids", dq)
+            self.assertEqual(len(dq["missing_transcript_ids"]), 1)
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Data quality", report_text)
+            self.assertIn("Missing transcript records", report_text)
+            self.assertIn("data_quality.json", report_text)
+
+    def test_data_quality_clean_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=3, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            analyze_dataset(root / "evidence", root / "results")
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Data quality", report_text)
+            self.assertIn("No duplicate IDs, missing records, or duplicate tool-call IDs detected", report_text)
+
     def test_mitre_deduplication_per_finding(self) -> None:
         from orbit_ir.analyzer import _mitre_for_reasons
         techniques = _mitre_for_reasons(["tool-name-mismatch", "argument-digest-mismatch"])
