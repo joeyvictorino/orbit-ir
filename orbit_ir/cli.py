@@ -1221,6 +1221,11 @@ def build_parser() -> argparse.ArgumentParser:
     pd_p.add_argument("--format", choices=["text", "json"], default="text")
     pd_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
+    oh_p = subparsers.add_parser("objective-hijack", help="Detect objective hijacking patterns in agent behavior")
+    oh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    oh_p.add_argument("--format", choices=["text", "json"], default="text")
+    oh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -3543,6 +3548,26 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Role impersonation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "objective-hijack":
+        from orbit_ir.objective_hijack import (
+            analyze_objective_hijack,
+            format_json as format_oh_json,
+            format_text as format_oh_text,
+        )
+        from orbit_ir.objective_hijack import _load_events as _load_oh_events
+        events = _load_oh_events(str(args.evidence_dir))
+        report = analyze_objective_hijack(events)
+        if args.format == "json":
+            output = format_oh_json(report)
+        else:
+            output = format_oh_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Objective hijack analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
