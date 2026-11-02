@@ -115,6 +115,8 @@ from .privilege_abuse import analyze_privilege_abuse, format_text as format_priv
 from .tool_misuse import analyze_tool_misuse, format_text as format_toolmisuse_text, format_json as format_toolmisuse_json, _load_events as _load_toolmisuse_events
 from .sandbox_escape import analyze_sandbox_escape, format_text as format_escape_text, format_json as format_escape_json, _load_events as _load_escape_events
 from .supply_chain import analyze_supply_chain, format_text as format_sc_text, format_json as format_sc_json, _load_events as _load_sc_events
+from .api_abuse import analyze_api_abuse, format_text as format_apiabuse_text, format_json as format_apiabuse_json, _load_events as _load_apiabuse_events
+from .memory_forensics import analyze_memory_forensics, format_text as format_memfor_text, format_json as format_memfor_json, _load_events as _load_memfor_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -796,6 +798,16 @@ def build_parser() -> argparse.ArgumentParser:
     sc_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     sc_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     sc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    apiabuse_p = subparsers.add_parser("api-abuse", help="Detect API abuse patterns")
+    apiabuse_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    apiabuse_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    apiabuse_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    memfor_p = subparsers.add_parser("memory-forensics", help="Detect context manipulation and memory tampering")
+    memfor_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    memfor_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    memfor_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2191,6 +2203,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Supply chain report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "api-abuse":
+        evidence_events = _load_apiabuse_events(args.evidence_dir)
+        report = analyze_api_abuse(evidence_events)
+        if args.format == "json":
+            output = format_apiabuse_json(report)
+        else:
+            output = format_apiabuse_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"API abuse report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "memory-forensics":
+        evidence_events = _load_memfor_events(args.evidence_dir)
+        report = analyze_memory_forensics(evidence_events)
+        if args.format == "json":
+            output = format_memfor_json(report)
+        else:
+            output = format_memfor_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Memory forensics report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
