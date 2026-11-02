@@ -134,6 +134,8 @@ from .steganography import analyze_steganography, format_text as format_stego_te
 from .behavior_cluster import analyze_behavior_clusters, format_text as format_cluster_text, format_json as format_cluster_json, _load_events as _load_cluster_events
 from .token_trace import analyze_token_trace, format_text as format_tt_text, format_json as format_tt_json, _load_events as _load_tt_events
 from .event_graph import analyze_event_graph, format_text as format_eg_text, format_json as format_eg_json, _load_events as _load_eg_events
+from .chain_of_thought import analyze_chain_of_thought, format_text as format_cot_text, format_json as format_cot_json, _load_events as _load_cot_events
+from .alert_fatigue import analyze_alert_fatigue, format_text as format_af_text, format_json as format_af_json, _load_events as _load_af_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -913,6 +915,16 @@ def build_parser() -> argparse.ArgumentParser:
     eg_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     eg_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     eg_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cot_p = subparsers.add_parser("chain-of-thought", help="Analyze reasoning traces for anomalous thought patterns")
+    cot_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cot_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cot_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    af_p = subparsers.add_parser("alert-fatigue", help="Detect redundant and duplicate alerts causing analyst fatigue")
+    af_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    af_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    af_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -2576,6 +2588,34 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Event graph written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "chain-of-thought":
+        events = _load_cot_events(args.evidence_dir)
+        report = analyze_chain_of_thought(events)
+        if args.format == "json":
+            output = format_cot_json(report)
+        else:
+            output = format_cot_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Chain-of-thought analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "alert-fatigue":
+        events = _load_af_events(args.evidence_dir)
+        report = analyze_alert_fatigue(events)
+        if args.format == "json":
+            output = format_af_json(report)
+        else:
+            output = format_af_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Alert fatigue analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
