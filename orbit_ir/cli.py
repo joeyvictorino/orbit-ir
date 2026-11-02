@@ -52,6 +52,7 @@ from .pivot import pivot_events, format_pivot_text
 from .redact import redact_evidence, format_redact_text
 from .batch import parse_batch_file, run_batch, format_batch_text
 from .diff_agents import diff_agents, format_diff_agents_text
+from .filter import filter_events, format_filter_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -353,6 +354,19 @@ def build_parser() -> argparse.ArgumentParser:
     da.add_argument("--agent-a", required=True, help="First agent ID")
     da.add_argument("--agent-b", required=True, help="Second agent ID")
     da.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
+    piv = subparsers.add_parser("pivot", help="Cross-field pivot table for evidence events")
+    piv.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    piv.add_argument("--row", required=True, help="Row field (supports dot notation, e.g. agent_id)")
+    piv.add_argument("--col", required=True, help="Column field (supports dot notation, e.g. event_type)")
+    piv.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    flt = subparsers.add_parser("filter", help="Complex event queries with AND/OR combinators")
+    flt.add_argument("--input", type=Path, required=True, help="Evidence directory or JSONL file")
+    flt.add_argument("--query", required=True,
+                     help="Filter expression: field=val, field!=val, field~regex, field>n; AND with comma, OR with pipe")
+    flt.add_argument("--limit", type=int, default=None, help="Max events to return")
+    flt.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -731,6 +745,20 @@ def _run(args: argparse.Namespace) -> None:
             print(json.dumps(result, sort_keys=True, indent=2))
         else:
             print(format_diff_agents_text(result), end="")
+        return
+    elif args.command == "filter":
+        result = filter_events(args.input, args.query, limit=args.limit)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_filter_text(result), end="")
+        return
+    elif args.command == "pivot":
+        result = pivot_events(args.input, args.row, args.col)
+        if args.format == "json":
+            print(json.dumps(result, sort_keys=True, indent=2))
+        else:
+            print(format_pivot_text(result), end="")
         return
     elif args.command == "analyze":
         summary = analyze_dataset(
