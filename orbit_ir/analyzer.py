@@ -692,6 +692,11 @@ def analyze_dataset(
 
     report = _render_report(summary, evidence_manifest, timeline_events, data_quality, trajectories, agent_clusters, lateral_movement)
     (output_dir / "report.md").write_text(report, encoding="utf-8")
+
+    from .html_report import render_html_report
+
+    html_content = render_html_report(report, title=f"ORBIT Analysis — {output_dir.name}")
+    (output_dir / "report.html").write_text(html_content, encoding="utf-8")
     return summary
 
 
