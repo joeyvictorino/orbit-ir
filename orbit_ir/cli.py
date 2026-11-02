@@ -95,6 +95,8 @@ from .session_replay import replay_sessions, format_replay_text as format_sessio
 from .intent import classify_intents, format_intent_text, format_intent_json
 from .dwell_time import analyze as analyze_dwell_time, format_text as format_dwell_text, format_json as format_dwell_json
 from .access_pattern import analyze as analyze_access_pattern, format_text as format_access_text, format_json as format_access_json
+from .threat_intel import analyze as analyze_threat_intel, format_text as format_threat_text, format_json as format_threat_json
+from .sla import analyze as analyze_sla, format_text as format_sla_text, format_json as format_sla_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -669,6 +671,20 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--baseline-start", type=int, default=6, help="Baseline hours start (default: 6)")
     ap.add_argument("--baseline-end", type=int, default=22, help="Baseline hours end (default: 22)")
     ap.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ti = subparsers.add_parser("threat-intel", help="Enrich extracted IOCs against threat intelligence feeds")
+    ti.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    ti.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    ti.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    sla_p = subparsers.add_parser("sla", help="Measure incident response times against SLA targets")
+    sla_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    sla_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    sla_p.add_argument("--ack-minutes", type=float, default=None, help="SLA target for time to acknowledge (minutes)")
+    sla_p.add_argument("--contain-minutes", type=float, default=None, help="SLA target for time to contain (minutes)")
+    sla_p.add_argument("--resolve-minutes", type=float, default=None, help="SLA target for time to resolve (minutes)")
+    sla_p.add_argument("--notify-minutes", type=float, default=None, help="SLA target for time to notify (minutes)")
+    sla_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1775,6 +1791,43 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Access pattern analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "threat-intel":
+        report = analyze_threat_intel(args.evidence_dir)
+        if args.format == "json":
+            output = format_threat_json(report)
+        else:
+            output = format_threat_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Threat intel report written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "sla":
+        sla_targets = None
+        if any(v is not None for v in [args.ack_minutes, args.contain_minutes, args.resolve_minutes, args.notify_minutes]):
+            sla_targets = {}
+            if args.ack_minutes is not None:
+                sla_targets["time_to_acknowledge_minutes"] = args.ack_minutes
+            if args.contain_minutes is not None:
+                sla_targets["time_to_contain_minutes"] = args.contain_minutes
+            if args.resolve_minutes is not None:
+                sla_targets["time_to_resolve_minutes"] = args.resolve_minutes
+            if args.notify_minutes is not None:
+                sla_targets["time_to_notify_minutes"] = args.notify_minutes
+        report = analyze_sla(args.evidence_dir, sla_targets=sla_targets)
+        if args.format == "json":
+            output = format_sla_json(report)
+        else:
+            output = format_sla_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"SLA report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
