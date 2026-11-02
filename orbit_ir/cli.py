@@ -81,6 +81,8 @@ from .compliance_map import map_compliance, format_compliance_map_text
 from .evidence_score import score_evidence, format_evidence_score_text
 from .stix_export import STIXExporter, export_stix
 from .executive_brief import ExecutiveBriefGenerator, generate_executive_brief, format_brief_text, format_brief_markdown
+from .ingest import EvidenceIngester, format_ingest_text
+from .report_template import TemplateReporter, list_templates, show_template, format_template_list
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -561,6 +563,21 @@ def build_parser() -> argparse.ArgumentParser:
     eb.add_argument("--classification", default="CONFIDENTIAL", help="Document classification level")
     eb.add_argument("--format", choices=["text", "json", "markdown"], default="text", help="Output format")
     eb.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    ig = subparsers.add_parser("ingest", help="Ingest evidence from multiple formats (JSON, CSV, syslog, CloudTrail)")
+    ig.add_argument("--input", type=Path, required=True, help="Evidence file or directory to ingest")
+    ig.add_argument("--format", choices=["json", "csv", "syslog", "cloudtrail", "auto"], default="auto", help="Input format (default: auto-detect)")
+    ig.add_argument("--output", type=Path, default=None, help="Write normalised events to output directory")
+    ig.add_argument("--column-map", type=str, default=None, help="CSV column mapping as JSON object, e.g. '{\"timestamp\":\"ts\",\"agent\":\"actor\"}'")
+
+    rt = subparsers.add_parser("report-template", help="Generate reports from customizable templates")
+    rt.add_argument("--list", action="store_true", default=False, help="List available report templates")
+    rt.add_argument("--show", type=str, default=None, metavar="NAME", help="Show template source for a builtin template")
+    rt.add_argument("--path", type=Path, default=None, help="Evidence directory or file")
+    rt.add_argument("--template", type=str, default="full", help="Template name or path to custom template file")
+    rt.add_argument("--title", type=str, default="Incident Report", help="Report title")
+    rt.add_argument("--format", choices=["text", "markdown", "html"], default="text", help="Output format")
+    rt.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -1396,6 +1413,41 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Executive brief written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "ingest":
+        column_map = None
+        if args.column_map:
+            column_map = json.loads(args.column_map)
+        ingester = EvidenceIngester(column_map=column_map)
+        ingester.ingest(args.input, fmt=args.format, output_dir=args.output)
+        print(format_ingest_text(ingester.summary()))
+        return
+    elif args.command == "report-template":
+        if args.list:
+            print(format_template_list(list_templates()))
+            return
+        if args.show:
+            tmpl = show_template(args.show)
+            if tmpl is None:
+                print(f"Unknown template: {args.show}", file=sys.stderr)
+                raise SystemExit(1)
+            print(tmpl, end="")
+            return
+        if not args.path:
+            print("error: --path is required when rendering a report", file=sys.stderr)
+            raise SystemExit(2)
+        reporter = TemplateReporter()
+        rendered = reporter.render(args.template, args.path, title=args.title)
+        if args.format == "html":
+            output = reporter.to_html(rendered)
+        else:
+            output = rendered
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Report written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
