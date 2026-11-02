@@ -130,6 +130,8 @@ from .session_stats import analyze as analyze_session_stats, format_text as form
 from .role_drift import analyze_role_drift, format_text as format_rd_text, format_json as format_rd_json, _load_events as _load_rd_events
 from .deception_detect import analyze_deception, format_text as format_deception_text, format_json as format_deception_json, _load_events as _load_deception_events
 from .goal_drift import analyze_goal_drift, format_text as format_goaldrift_text, format_json as format_goaldrift_json, _load_events as _load_goaldrift_events
+from .steganography import analyze_steganography, format_text as format_stego_text, format_json as format_stego_json, _load_events as _load_stego_events
+from .behavior_cluster import analyze_behavior_clusters, format_text as format_cluster_text, format_json as format_cluster_json, _load_events as _load_cluster_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -882,6 +884,17 @@ def build_parser() -> argparse.ArgumentParser:
     deception_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
     deception_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     deception_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    stego_p = subparsers.add_parser("steganography", help="Detect hidden communication channels in agent behavior")
+    stego_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    stego_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    stego_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cluster_p = subparsers.add_parser("behavior-cluster", help="Cluster agents by behavioral similarity")
+    cluster_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
+    cluster_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    cluster_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+    cluster_p.add_argument("--threshold", type=float, default=0.3, help="Similarity threshold for clustering (0-1)")
 
     goaldrift_p = subparsers.add_parser("goal-drift", help="Detect agent goal deviation and objective drift")
     goaldrift_p.add_argument("evidence_dir", type=Path, help="Evidence directory to analyze")
@@ -2484,6 +2497,34 @@ def _run(args: argparse.Namespace) -> None:
         else:
             print(output, end="")
         return
+    elif args.command == "steganography":
+        events = _load_stego_events(args.evidence_dir)
+        report = analyze_steganography(events)
+        if args.format == "json":
+            output = format_stego_json(report)
+        else:
+            output = format_stego_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Steganography detection written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "behavior-cluster":
+        events = _load_cluster_events(args.evidence_dir)
+        report = analyze_behavior_clusters(events, similarity_threshold=args.threshold)
+        if args.format == "json":
+            output = format_cluster_json(report)
+        else:
+            output = format_cluster_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Behavior clustering written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
     elif args.command == "goal-drift":
         events = _load_goaldrift_events(args.evidence_dir)
         report = analyze_goal_drift(events, window_size=args.window_size)
@@ -2495,6 +2536,20 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Goal drift analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "steganography":
+        events = _load_stego_events(args.evidence_dir)
+        report = analyze_steganography(events)
+        if args.format == "json":
+            output = format_stego_json(report)
+        else:
+            output = format_stego_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Steganography analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
