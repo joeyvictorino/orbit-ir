@@ -1,193 +1,182 @@
-"""Tests for dns_tunneling detection module."""
 import json
 import os
 import tempfile
 import pytest
-from orbit_ir.dns_tunneling import (
-    CATEGORIES,
-    classify_event,
-    analyze,
-    format_report,
-    load_events,
-)
-
-
-class TestCategories:
-    def test_category_count(self):
-        assert len(CATEGORIES) == 6
-
-    def test_each_category_has_10_indicators(self):
-        for cat, info in CATEGORIES.items():
-            assert len(info["indicators"]) == 10, f"{cat} has {len(info['indicators'])}"
-
-    def test_all_categories_have_description(self):
-        for cat, info in CATEGORIES.items():
-            assert "description" in info and len(info["description"]) > 0
-
-    def test_no_duplicate_indicators_within_category(self):
-        for cat, info in CATEGORIES.items():
-            assert len(info["indicators"]) == len(set(info["indicators"]))
-
-    def test_expected_categories_present(self):
-        expected = {"dns_exfil", "dns_c2", "dns_rebinding", "dns_amplification", "dns_hijack", "dns_covert_channel"}
-        assert set(CATEGORIES.keys()) == expected
+from orbit_ir.dns_tunneling import classify_event, analyze, format_report, load_events, CATEGORIES
 
 
 class TestClassifyEvent:
-    def test_empty_event(self):
-        assert classify_event({}) == {}
+    def test_dns_tunneling(self):
+        assert classify_event("Detected dns tunneling activity") == "dns_exfiltration"
 
-    def test_no_match(self):
-        ev = {"description": "normal http request to api endpoint"}
-        assert classify_event(ev) == {}
+    def test_dns_exfiltration(self):
+        assert classify_event("dns exfiltration detected in traffic") == "dns_exfiltration"
 
-    def test_dns_exfil_match(self):
-        ev = {"description": "high entropy subdomain detected in DNS query with unusually long dns query"}
-        result = classify_event(ev)
-        assert "dns_exfil" in result
-        assert result["dns_exfil"]["count"] >= 1
+    def test_base64_dns(self):
+        assert classify_event("base64 dns encoded payload found") == "dns_exfiltration"
 
-    def test_dns_c2_match(self):
-        ev = {"description": "periodic dns beacon observed with consistent interval dns polling"}
-        result = classify_event(ev)
-        assert "dns_c2" in result
+    def test_dns_c2_channel(self):
+        assert classify_event("dns c2 channel established") == "dns_c2"
 
-    def test_dns_rebinding_match(self):
-        ev = {"description": "rapid dns ttl change detected with dns resolution to private range"}
-        result = classify_event(ev)
-        assert "dns_rebinding" in result
+    def test_dns_beacon(self):
+        assert classify_event("periodic dns beacon detected") == "dns_c2"
 
-    def test_dns_amplification_match(self):
-        ev = {"description": "large dns response to small query indicating amplification ratio exceeded"}
-        result = classify_event(ev)
-        assert "dns_amplification" in result
+    def test_dns_polling(self):
+        assert classify_event("dns polling for command updates") == "dns_c2"
 
-    def test_dns_hijack_match(self):
-        ev = {"description": "unexpected dns response source with cache poisoning attempt"}
-        result = classify_event(ev)
-        assert "dns_hijack" in result
+    def test_unusual_dns_query(self):
+        assert classify_event("unusual dns query pattern observed") == "unusual_query"
 
-    def test_dns_covert_channel_match(self):
-        ev = {"description": "iodine tunnel signature found in dnscat2 protocol signature packet"}
-        result = classify_event(ev)
-        assert "dns_covert_channel" in result
+    def test_dga_domain(self):
+        assert classify_event("dga domain generation detected") == "unusual_query"
 
-    def test_multiple_categories(self):
-        ev = {"description": "high entropy subdomain with periodic dns beacon and iodine tunnel signature"}
-        result = classify_event(ev)
-        assert len(result) >= 2
+    def test_excessive_nxdomain(self):
+        assert classify_event("excessive nxdomain responses observed") == "unusual_query"
+
+    def test_dns_amplification(self):
+        assert classify_event("dns amplification attack detected") == "protocol_abuse"
+
+    def test_dns_rebinding(self):
+        assert classify_event("dns rebinding attempt found") == "protocol_abuse"
+
+    def test_axfr_query(self):
+        assert classify_event("unauthorized axfr query detected") == "protocol_abuse"
+
+    def test_iodine_tunnel(self):
+        assert classify_event("iodine tunnel traffic observed") == "tunnel_tool"
+
+    def test_dnscat(self):
+        assert classify_event("dnscat session initiated") == "tunnel_tool"
+
+    def test_cobalt_strike_dns(self):
+        assert classify_event("cobalt strike dns channel active") == "tunnel_tool"
+
+    def test_cname_tunneling(self):
+        assert classify_event("cname tunneling detected in queries") == "record_abuse"
+
+    def test_mx_record_exfil(self):
+        assert classify_event("mx record exfil data transfer") == "record_abuse"
+
+    def test_unknown(self):
+        assert classify_event("normal web traffic") == "unknown"
+
+    def test_none_event(self):
+        assert classify_event(None) == "unknown"
+
+    def test_empty_string(self):
+        assert classify_event("") == "unknown"
+
+    def test_whitespace_only(self):
+        assert classify_event("   ") == "unknown"
+
+    def test_dict_event(self):
+        assert classify_event({"action": "dns tunneling detected"}) == "dns_exfiltration"
 
     def test_case_insensitive(self):
-        ev = {"description": "HIGH ENTROPY SUBDOMAIN detected"}
-        result = classify_event(ev)
-        assert "dns_exfil" in result
+        assert classify_event("DNS TUNNELING Detected") == "dns_exfiltration"
 
-    def test_raw_field_used(self):
-        ev = {"raw": "high entropy subdomain in DNS log"}
-        result = classify_event(ev)
-        assert "dns_exfil" in result
+    def test_non_string_non_dict(self):
+        assert classify_event(42) == "unknown"
 
 
 class TestAnalyze:
-    def test_empty_events(self):
+    def test_empty(self):
         result = analyze([])
-        assert result["module"] == "dns_tunneling"
-        assert result["total_indicators"] == 0
+        assert result["total_events"] == 0
+        assert result["flagged_count"] == 0
         assert result["severity"] == "none"
-        assert len(result["flagged_events"]) == 0
 
     def test_single_match(self):
-        events = [{"description": "high entropy subdomain in query"}]
-        result = analyze(events)
-        assert result["total_indicators"] >= 1
-        assert result["severity"] in ("medium", "high", "critical")
+        result = analyze(["dns tunneling detected"])
+        assert result["flagged_count"] == 1
+        assert result["severity"] == "medium"
 
-    def test_severity_medium(self):
-        events = [{"description": "periodic dns beacon"}]
+    def test_no_matches(self):
+        result = analyze(["normal traffic", "safe query"])
+        assert result["flagged_count"] == 0
+
+    def test_severity_high(self):
+        events = [f"dns tunneling event {i}" for i in range(6)]
         result = analyze(events)
-        assert result["severity"] in ("medium", "high", "critical")
+        assert result["severity"] == "high"
 
     def test_severity_critical(self):
-        indicators = list(CATEGORIES["dns_exfil"]["indicators"])
-        events = [{"description": " ".join(i.replace("_", " ") for i in indicators)}]
+        events = [f"dns tunneling event {i}" for i in range(11)]
         result = analyze(events)
-        assert result["total_indicators"] > 0
+        assert result["severity"] == "critical"
 
-    def test_category_counts_populated(self):
-        events = [
-            {"description": "high entropy subdomain found"},
-            {"description": "periodic dns beacon seen"},
-        ]
+    def test_category_counts(self):
+        events = ["dns tunneling detected", "dns c2 channel found", "dns tunneling again"]
         result = analyze(events)
-        assert "dns_exfil" in result["category_counts"]
-        assert "dns_c2" in result["category_counts"]
+        assert result["category_counts"]["dns_exfiltration"] == 2
+        assert result["category_counts"]["dns_c2"] == 1
 
-    def test_no_match_events(self):
-        events = [{"description": "regular web browsing activity"}]
-        result = analyze(events)
-        assert result["total_indicators"] == 0
-        assert result["severity"] == "none"
+    def test_detection_rate(self):
+        result = analyze(["dns tunneling", "normal", "dns c2 channel", "safe"])
+        assert result["detection_rate"] == 0.5
 
-    def test_flagged_events_structure(self):
-        events = [{"id": "ev1", "description": "iodine tunnel signature detected"}]
-        result = analyze(events)
-        if result["flagged_events"]:
-            fe = result["flagged_events"][0]
-            assert "event" in fe
-            assert "classifications" in fe
+    def test_flagged_structure(self):
+        result = analyze(["dns tunneling activity"])
+        entry = result["flagged_events"][0]
+        assert entry["index"] == 0
+        assert entry["category"] == "dns_exfiltration"
+        assert entry["event"] == "dns tunneling activity"
 
 
 class TestFormatReport:
     def test_format_empty(self):
         result = analyze([])
-        report = format_report(result)
-        assert "DNS Tunneling Detection Report" in report
-        assert "none" in report
+        text = format_report(result)
+        assert "DNS Tunneling" in text
 
     def test_format_with_findings(self):
-        events = [{"id": "e1", "description": "high entropy subdomain with periodic dns beacon"}]
+        result = analyze(["dns tunneling activity"])
+        text = format_report(result)
+        assert "dns_exfiltration" in text
+
+    def test_format_truncation(self):
+        events = [f"dns tunneling event {i}" for i in range(15)]
         result = analyze(events)
-        report = format_report(result)
-        assert "Flagged events:" in report
+        text = format_report(result)
+        assert "... and 5 more" in text
 
-    def test_format_includes_severity(self):
-        result = analyze([{"description": "high entropy subdomain"}])
-        report = format_report(result)
-        assert "Severity:" in report
-
-    def test_format_includes_category(self):
-        result = analyze([{"description": "high entropy subdomain"}])
-        report = format_report(result)
-        assert "dns_exfil" in report
+    def test_format_detection_rate(self):
+        result = analyze(["dns tunneling", "normal"])
+        text = format_report(result)
+        assert "50.0%" in text
 
 
 class TestLoadEvents:
     def test_load_list(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump([{"id": "1", "description": "test"}], f)
-            path = f.name
-        try:
-            events = load_events(path)
-            assert len(events) == 1
-        finally:
-            os.unlink(path)
+            json.dump(["event1", "event2"], f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 2
 
     def test_load_dict_with_events_key(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({"events": [{"id": "1"}, {"id": "2"}]}, f)
-            path = f.name
-        try:
-            events = load_events(path)
-            assert len(events) == 2
-        finally:
-            os.unlink(path)
+            json.dump({"events": ["a", "b"]}, f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 2
 
-    def test_load_empty_list(self):
+    def test_load_single_dict(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump([], f)
-            path = f.name
-        try:
-            events = load_events(path)
-            assert events == []
-        finally:
-            os.unlink(path)
+            json.dump({"action": "test"}, f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 1
+
+
+class TestCategories:
+    def test_all_categories_have_patterns(self):
+        for cat, patterns in CATEGORIES.items():
+            assert len(patterns) > 0, f"category {cat} has no patterns"
+
+    def test_category_names(self):
+        expected = {"dns_exfiltration", "dns_c2", "unusual_query", "protocol_abuse", "tunnel_tool", "record_abuse"}
+        assert set(CATEGORIES.keys()) == expected

@@ -1,177 +1,131 @@
-"""DNS tunneling detection module for orbit-ir."""
+"""DNS tunneling detection module for agent incident reconstruction."""
+
+import json
 
 CATEGORIES = {
-    "dns_exfil": {
-        "description": "DNS-based data exfiltration via encoded subdomains",
-        "indicators": [
-            "high_entropy_subdomain",
-            "unusually_long_dns_query",
-            "base64_encoded_subdomain",
-            "hex_encoded_subdomain",
-            "excessive_txt_record_queries",
-            "dns_query_to_known_tunnel_domain",
-            "rapid_sequential_dns_lookups",
-            "subdomain_length_exceeds_threshold",
-            "non_standard_dns_record_type",
-            "dns_response_with_encoded_payload",
-        ],
-    },
-    "dns_c2": {
-        "description": "Command and control communication over DNS",
-        "indicators": [
-            "periodic_dns_beacon",
-            "dns_txt_record_command_response",
-            "alternating_query_response_pattern",
-            "dns_query_with_encoded_instruction",
-            "consistent_interval_dns_polling",
-            "dns_response_payload_variation",
-            "dns_cname_chain_redirection",
-            "dns_mx_record_abuse",
-            "query_to_dynamic_dns_provider",
-            "dns_ns_record_delegation_abuse",
-        ],
-    },
-    "dns_rebinding": {
-        "description": "DNS rebinding attacks to bypass same-origin policy",
-        "indicators": [
-            "rapid_dns_ttl_change",
-            "dns_response_ip_oscillation",
-            "short_ttl_followed_by_internal_ip",
-            "dns_resolution_to_private_range",
-            "multiple_a_records_with_mixed_scope",
-            "ttl_zero_dns_response",
-            "dns_rebind_to_localhost",
-            "rapid_ip_change_for_same_domain",
-            "dns_response_with_rfc1918_address",
-            "alternating_public_private_resolution",
-        ],
-    },
-    "dns_amplification": {
-        "description": "DNS amplification and reflection attacks",
-        "indicators": [
-            "large_dns_response_to_small_query",
-            "any_query_type_abuse",
-            "open_resolver_exploitation",
-            "spoofed_source_dns_query",
-            "amplification_ratio_exceeded",
-            "dns_response_size_anomaly",
-            "recursive_query_from_external",
-            "edns0_buffer_size_abuse",
-            "dns_reflection_pattern",
-            "high_volume_dns_to_single_target",
-        ],
-    },
-    "dns_hijack": {
-        "description": "DNS hijacking and poisoning attempts",
-        "indicators": [
-            "unexpected_dns_response_source",
-            "dns_response_mismatch",
-            "cache_poisoning_attempt",
-            "dns_id_prediction_pattern",
-            "kaminsky_attack_pattern",
-            "glue_record_injection",
-            "dns_response_from_non_resolver",
-            "dnssec_validation_failure",
-            "phantom_domain_attack",
-            "nxdomain_hijacking",
-        ],
-    },
-    "dns_covert_channel": {
-        "description": "Covert communication channels using DNS protocol",
-        "indicators": [
-            "steganographic_dns_payload",
-            "dns_query_timing_pattern",
-            "iodine_tunnel_signature",
-            "dnscat2_protocol_signature",
-            "dns2tcp_tunnel_pattern",
-            "custom_dns_protocol_encoding",
-            "dns_over_icmp_encapsulation",
-            "null_byte_padding_in_dns",
-            "fragmented_dns_message_chain",
-            "dns_label_encoding_anomaly",
-        ],
-    },
+    "dns_exfiltration": [
+        "dns tunneling", "dns exfiltration", "dns covert channel",
+        "dns data exfil", "encoded dns query", "base64 dns",
+        "hex encoded subdomain", "long subdomain query",
+        "dns payload encoding", "txt record exfil",
+    ],
+    "dns_c2": [
+        "dns command and control", "dns c2 channel", "dns beacon",
+        "dns callback", "periodic dns query", "dns polling",
+        "dns c2 communication", "dns command channel",
+        "dns control channel", "dns c2 beacon",
+    ],
+    "unusual_query": [
+        "unusual dns query", "anomalous dns traffic", "dns query anomaly",
+        "suspicious dns pattern", "dns query length anomaly",
+        "excessive nxdomain", "dns entropy anomaly", "random subdomain",
+        "dga domain", "domain generation algorithm",
+    ],
+    "protocol_abuse": [
+        "dns protocol abuse", "dns amplification", "dns reflection",
+        "dns rebinding", "dns hijack", "dns cache poisoning",
+        "dns spoofing", "dnssec bypass", "dns zone transfer",
+        "axfr query",
+    ],
+    "tunnel_tool": [
+        "iodine tunnel", "dnscat", "dns2tcp", "dnscapy",
+        "ozymandns", "heyoka dns", "tuns dns", "cobalt strike dns",
+        "dns over https tunnel", "doh tunnel",
+    ],
+    "record_abuse": [
+        "cname tunneling", "mx record exfil", "null record abuse",
+        "srv record tunnel", "dns record manipulation",
+        "aaaa record tunnel", "ns record abuse", "soa record abuse",
+        "ptr record tunnel", "txt record misuse",
+    ],
 }
 
 
 def classify_event(event):
-    """Classify a single event against DNS tunneling indicators."""
-    results = {}
-    desc = (event.get("description", "") + " " + event.get("raw", "")).lower()
-    for category, info in CATEGORIES.items():
-        matched = []
-        for indicator in info["indicators"]:
-            tokens = indicator.replace("_", " ")
-            words = tokens.split()
-            if len(words) >= 2 and all(w in desc for w in words):
-                matched.append(indicator)
-        if matched:
-            results[category] = {
-                "matched_indicators": matched,
-                "count": len(matched),
-                "description": info["description"],
-            }
-    return results
-
-
-def _severity(count):
-    if count > 10:
-        return "critical"
-    if count > 5:
-        return "high"
-    if count > 0:
-        return "medium"
-    return "none"
+    if event is None:
+        return "unknown"
+    if isinstance(event, dict):
+        text = " ".join(str(v) for v in event.values()).lower()
+    elif isinstance(event, str):
+        text = event.lower()
+    else:
+        return "unknown"
+    if not text.strip():
+        return "unknown"
+    for category, indicators in CATEGORIES.items():
+        for indicator in indicators:
+            if indicator in text:
+                return category
+    return "unknown"
 
 
 def analyze(events):
-    """Analyze a list of events for DNS tunneling patterns."""
-    category_counts = {c: 0 for c in CATEGORIES}
-    event_results = []
-    for ev in events:
-        cl = classify_event(ev)
-        if cl:
-            event_results.append({"event": ev, "classifications": cl})
-            for cat in cl:
-                category_counts[cat] += cl[cat]["count"]
-    total = sum(category_counts.values())
+    total = len(events)
+    flagged = []
+    category_counts = {}
+
+    for i, event in enumerate(events):
+        cat = classify_event(event)
+        if cat != "unknown":
+            flagged.append({"index": i, "category": cat, "event": event})
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    flagged_count = len(flagged)
+    if flagged_count > 10:
+        severity = "critical"
+    elif flagged_count > 5:
+        severity = "high"
+    elif flagged_count > 0:
+        severity = "medium"
+    else:
+        severity = "none"
+
     return {
-        "module": "dns_tunneling",
-        "total_indicators": total,
-        "severity": _severity(total),
+        "total_events": total,
+        "flagged_count": flagged_count,
+        "flagged_events": flagged,
         "category_counts": category_counts,
-        "flagged_events": event_results,
+        "severity": severity,
+        "detection_rate": flagged_count / total if total > 0 else 0.0,
     }
 
 
-def format_report(results):
-    """Format analysis results as human-readable text."""
+def format_report(result):
     lines = [
         "DNS Tunneling Detection Report",
         "=" * 40,
-        f"Severity: {results['severity']}",
-        f"Total indicators: {results['total_indicators']}",
         "",
-        "Category breakdown:",
+        f"  Total events:      {result['total_events']}",
+        f"  Flagged:           {result['flagged_count']}",
+        f"  Severity:          {result['severity']}",
+        f"  Detection rate:    {result['detection_rate']:.1%}",
+        "",
     ]
-    for cat, count in results["category_counts"].items():
-        if count > 0:
-            lines.append(f"  {cat}: {count}")
+    if result["category_counts"]:
+        lines.append("  Categories:")
+        for cat, count in sorted(result["category_counts"].items()):
+            lines.append(f"    {cat:30s} {count}")
+        lines.append("")
+
+    shown = result["flagged_events"][:10]
+    if shown:
+        lines.append("  Flagged events:")
+        for entry in shown:
+            evt = str(entry["event"])[:80]
+            lines.append(f"    [{entry['index']}] {entry['category']:20s} {evt}")
+    if result["flagged_count"] > 10:
+        lines.append(f"    ... and {result['flagged_count'] - 10} more")
     lines.append("")
-    lines.append(f"Flagged events: {len(results['flagged_events'])}")
-    for fe in results["flagged_events"]:
-        eid = fe["event"].get("id", "unknown")
-        cats = ", ".join(fe["classifications"].keys())
-        lines.append(f"  [{eid}] {cats}")
     return "\n".join(lines)
 
 
 def load_events(path):
-    """Load events from a JSON file."""
-    import json
-
     with open(path) as f:
         data = json.load(f)
     if isinstance(data, list):
         return data
-    return data.get("events", [])
+    if isinstance(data, dict):
+        if "events" in data:
+            return data["events"]
+        return [data]
+    return [data]
