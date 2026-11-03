@@ -186,6 +186,8 @@ from .memory_tampering import analyze_memory_tampering, format_text as format_me
 from .trust_escalation import analyze_trust_escalation, format_text as format_tescal_text, format_json as format_tescal_json, _load_events as _load_tescal_events
 from .model_manipulation import analyze_model_manipulation, format_text as format_mm_text, format_json as format_mm_json, _load_events as _load_mm_events
 from .covert_channel import analyze_covert_channels, format_text as format_cc_text, format_json as format_cc_json, _load_events as _load_cc_events
+from .dependency_hijack import analyze_dependency_hijack, format_text as format_dh_text, format_json as format_dh_json, _load_events as _load_dh_events
+from .consent_violation import analyze_consent_violations, format_text as format_cv_text, format_json as format_cv_json, _load_events as _load_cv_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1275,6 +1277,16 @@ def build_parser() -> argparse.ArgumentParser:
     cc_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     cc_p.add_argument("--format", choices=["text", "json"], default="text")
     cc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    dh_p = subparsers.add_parser("dependency-hijack", help="Detect dependency hijack and supply chain manipulation")
+    dh_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    dh_p.add_argument("--format", choices=["text", "json"], default="text")
+    dh_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cv_p = subparsers.add_parser("consent-violation", help="Detect agents acting without proper authorization or consent")
+    cv_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    cv_p.add_argument("--format", choices=["text", "json"], default="text")
+    cv_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3818,6 +3830,48 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Covert channel analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+
+    elif args.command == "dependency-hijack":
+        from orbit_ir.dependency_hijack import (
+            analyze_dependency_hijack,
+            format_json as format_dh_json,
+            format_text as format_dh_text,
+        )
+        from orbit_ir.dependency_hijack import _load_events as _load_dh_events
+        events = _load_dh_events(str(args.evidence_dir))
+        report = analyze_dependency_hijack(events)
+        if args.format == "json":
+            output = format_dh_json(report)
+        else:
+            output = format_dh_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Dependency hijack analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+
+    elif args.command == "consent-violation":
+        from orbit_ir.consent_violation import (
+            analyze_consent_violations,
+            format_json as format_cv_json,
+            format_text as format_cv_text,
+        )
+        from orbit_ir.consent_violation import _load_events as _load_cv_events
+        events = _load_cv_events(str(args.evidence_dir))
+        report = analyze_consent_violations(events)
+        if args.format == "json":
+            output = format_cv_json(report)
+        else:
+            output = format_cv_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Consent violation analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
