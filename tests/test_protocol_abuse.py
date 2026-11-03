@@ -1,311 +1,180 @@
-"""Tests for network protocol abuse pattern detection."""
-import json
+"""Tests for protocol abuse detection module."""
+
+import os
 import tempfile
-from pathlib import Path
 
 from orbit_ir.protocol_abuse import (
-    analyze_protocol_abuse,
-    format_text,
-    format_json,
-    _classify_event,
-    _detect_chains,
-    _load_events,
     CATEGORIES,
+    analyze,
+    classify_event,
+    format_report,
+    load_events,
 )
 
 
 class TestClassifyEvent:
+    def test_dns_tunneling(self):
+        assert classify_event("unusually long dns query detected") == "dns_tunneling"
+
     def test_http_smuggling(self):
-        ev = {"message": "HTTP request smuggling detected via transfer encoding mismatch"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "http_smuggling" in cats
+        assert classify_event("content-length transfer-encoding mismatch found") == "http_smuggling"
 
     def test_protocol_downgrade(self):
-        ev = {"message": "Protocol downgrade attack forcing TLS version rollback to SSLv3"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_downgrade" in cats
+        assert classify_event("tls downgrade to ssl detected") == "protocol_downgrade"
 
-    def test_header_injection(self):
-        ev = {"message": "HTTP header injection via CRLF injection in host header"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "header_injection" in cats
+    def test_websocket_abuse(self):
+        assert classify_event("websocket origin bypass attempt") == "websocket_abuse"
 
-    def test_protocol_tunneling(self):
-        ev = {"message": "Covert tunnel via HTTP tunneling traffic through allowed protocol"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_tunneling" in cats
+    def test_grpc_manipulation(self):
+        assert classify_event("grpc metadata injection found") == "grpc_manipulation"
 
-    def test_tls_stripping(self):
-        ev = {"message": "SSL strip attack intercepting HTTPS connections"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "tls_stripping" in cats
+    def test_icmp_covert(self):
+        assert classify_event("icmp payload with encoded data detected") == "icmp_covert"
 
-    def test_protocol_fuzzing(self):
-        ev = {"message": "Protocol fuzz detected with malformed packets sent to HTTP service"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_fuzzing" in cats
-
-    def test_no_match(self):
-        ev = {"message": "Normal HTTP GET request completed with 200 OK"}
-        matches = _classify_event(ev)
-        assert matches == []
-
-    def test_multiple_categories(self):
-        ev = {"message": "HTTP smuggling with header injection via CRLF to strip TLS encryption"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert len(cats) >= 2
+    def test_uncategorized(self):
+        assert classify_event("normal network traffic") == "uncategorized"
 
     def test_case_insensitive(self):
-        ev = {"message": "HTTP REQUEST SMUGGLING via TRANSFER ENCODING MISMATCH"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert len(cats) >= 1
+        assert classify_event("UNUSUALLY LONG DNS QUERY") == "dns_tunneling"
 
-    def test_clte_attack(self):
-        ev = {"message": "CL.TE attack detected smuggling requests through proxy"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "http_smuggling" in cats
+    def test_empty_string(self):
+        assert classify_event("") == "uncategorized"
 
-    def test_poodle_attack(self):
-        ev = {"message": "POODLE attack exploiting protocol downgrade vulnerability"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_downgrade" in cats
+    def test_partial_match(self):
+        assert classify_event("found chunked encoding manipulation in request") == "http_smuggling"
 
-    def test_crlf_injection(self):
-        ev = {"message": "CRLF injection attack splitting HTTP response headers"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "header_injection" in cats
-
-    def test_dns_tunnel(self):
-        ev = {"message": "DNS tunnel detected encapsulating traffic through DNS protocol"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_tunneling" in cats
-
-    def test_sslstrip(self):
-        ev = {"message": "sslstrip tool detected stripping HTTPS connections"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "tls_stripping" in cats
-
-    def test_malformed_packet(self):
-        ev = {"message": "Sending malformed packets to crash the TCP service via fuzzing"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "protocol_fuzzing" in cats
+    def test_single_match(self):
+        assert classify_event("grpc channel without tls configured") == "grpc_manipulation"
 
 
 class TestAnalyze:
     def test_empty_events(self):
-        r = analyze_protocol_abuse([])
-        assert r.total_events == 0
-        assert r.abuse_events == 0
-        assert r.risk_level == "none"
-        assert r.risk_score == 0.0
+        result = analyze([])
+        assert result["total_events"] == 0
+        assert result["categorized"] == 0
+        assert result["title"] == "Protocol Abuse Detection Report"
 
-    def test_no_abuse(self):
-        events = [
-            {"agent_id": "a1", "message": "Normal HTTP request completed"},
-            {"agent_id": "a1", "message": "File transfer successful"},
-        ]
-        r = analyze_protocol_abuse(events)
-        assert r.total_events == 2
-        assert r.abuse_events == 0
-        assert r.risk_level == "none"
+    def test_single_event(self):
+        result = analyze(["unusually long dns query found"])
+        assert result["total_events"] == 1
+        assert result["categorized"] == 1
+        assert result["uncategorized"] == 0
 
-    def test_single_abuse(self):
+    def test_multiple_categories(self):
         events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via transfer encoding mismatch", "timestamp": "2025-01-01T00:01:00Z"},
+            "unusually long dns query found",
+            "content-length transfer-encoding mismatch",
+            "tls downgrade to ssl detected",
+            "websocket origin bypass",
+            "grpc metadata injection",
+            "icmp payload with encoded data",
         ]
-        r = analyze_protocol_abuse(events)
-        assert r.abuse_events == 1
-        assert r.risk_score > 0
-        assert "a1" in r.agents_involved
+        result = analyze(events)
+        assert result["total_events"] == 6
+        assert result["categorized"] == 6
+        cats = set(r["category"] for r in result["results"])
+        assert len(cats) == 6
 
-    def test_multiple_agents(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP smuggling detected via desync", "timestamp": "t1"},
-            {"agent_id": "a2", "message": "SSL strip attack intercepting connections", "timestamp": "t2"},
-        ]
-        r = analyze_protocol_abuse(events)
-        assert len(r.agents_involved) == 2
-
-    def test_critical_risk(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling detected", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "TLS stripping intercepting HTTPS", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "Protocol downgrade forcing SSLv3", "timestamp": "t3"},
-        ]
-        r = analyze_protocol_abuse(events)
-        assert r.risk_level in ("critical", "high")
+    def test_uncategorized_events(self):
+        result = analyze(["normal traffic", "regular operation"])
+        assert result["uncategorized"] == 2
 
     def test_category_counts(self):
         events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via desync"},
-            {"agent_id": "a1", "message": "Another request smuggling via transfer encoding mismatch"},
+            "unusually long dns query",
+            "encoded data in dns subdomain",
+            "content-length transfer-encoding mismatch",
         ]
-        r = analyze_protocol_abuse(events)
-        smuggling = [c for c in r.categories if c.category == "http_smuggling"]
-        assert len(smuggling) == 1
-        assert smuggling[0].count == 2
+        result = analyze(events)
+        assert result["category_counts"]["dns_tunneling"] == 2
+        assert result["category_counts"]["http_smuggling"] == 1
 
-    def test_all_categories_present(self):
-        r = analyze_protocol_abuse([])
-        cat_names = [c.category for c in r.categories]
-        for cat in CATEGORIES:
-            assert cat in cat_names
+    def test_mixed_events(self):
+        events = ["unusually long dns query", "normal traffic"]
+        result = analyze(events)
+        assert result["categorized"] == 1
+        assert result["uncategorized"] == 1
 
-    def test_risk_score_bounded(self):
-        events = [{"agent_id": "a1", "message": f"HTTP smuggling detected #{i}"} for i in range(50)]
-        r = analyze_protocol_abuse(events)
-        assert 0.0 <= r.risk_score <= 1.0
+    def test_results_structure(self):
+        result = analyze(["tls downgrade to ssl"])
+        assert len(result["results"]) == 1
+        assert "event" in result["results"][0]
+        assert "category" in result["results"][0]
 
-    def test_risk_levels(self):
-        none_r = analyze_protocol_abuse([])
-        assert none_r.risk_level == "none"
+    def test_all_uncategorized(self):
+        result = analyze(["nothing", "nada", "zilch"])
+        assert result["categorized"] == 0
+        assert result["uncategorized"] == 3
+
+    def test_duplicate_events(self):
+        result = analyze(["tls downgrade to ssl"] * 3)
+        assert result["total_events"] == 3
+        assert result["category_counts"]["protocol_downgrade"] == 3
 
 
-class TestChains:
-    def test_chain_detected(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via desync", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Header injection via CRLF in host", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "SSL strip attack on HTTPS connections", "timestamp": "t3"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert chains[0].agent == "a1"
-        assert len(chains[0].steps) >= 2
+class TestFormatReport:
+    def test_format_has_title(self):
+        result = analyze(["unusually long dns query"])
+        report = format_report(result)
+        assert "Protocol Abuse Detection Report" in report
 
-    def test_no_chain_single_event(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling detected"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) == 0
+    def test_format_has_counts(self):
+        result = analyze(["unusually long dns query", "normal traffic"])
+        report = format_report(result)
+        assert "Total events: 2" in report
+        assert "Categorized: 1" in report
 
-    def test_chain_score(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP smuggling via transfer encoding mismatch", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "SSL strip attack intercepting HTTPS", "timestamp": "t2"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert chains[0].abuse_score > 0
+    def test_format_has_details(self):
+        result = analyze(["tls downgrade to ssl"])
+        report = format_report(result)
+        assert "[protocol_downgrade]" in report
 
-    def test_chain_categories(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling detected", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "SSL strip attack intercepting connections", "timestamp": "t2"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert len(chains[0].categories_seen) >= 1
+    def test_format_empty(self):
+        result = analyze([])
+        report = format_report(result)
+        assert "Total events: 0" in report
 
 
 class TestLoadEvents:
-    def test_load_json(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([{"agent_id": "a1", "message": "test"}]))
-            events = _load_events(td)
-            assert len(events) == 1
+    def test_load_from_file(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("unusually long dns query\n")
+            f.write("content-length transfer-encoding mismatch\n")
+            f.write("\n")
+            f.write("normal traffic\n")
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 3
+            assert events[0] == "unusually long dns query"
+        finally:
+            os.unlink(path)
 
-    def test_load_missing(self):
-        events = _load_events("/nonexistent/path")
-        assert events == []
+    def test_load_empty_file(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("")
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 0
+        finally:
+            os.unlink(path)
 
-    def test_load_malformed(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "bad.json"
-            p.write_text("not json")
-            events = _load_events(td)
-            assert events == []
-
-    def test_load_single_object(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "single.json"
-            p.write_text(json.dumps({"agent_id": "a1", "message": "test"}))
-            events = _load_events(td)
-            assert len(events) == 1
-
-
-class TestFormat:
-    def test_format_text_nonempty(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via desync attack", "timestamp": "t1"},
-        ]
-        r = analyze_protocol_abuse(events)
-        text = format_text(r)
-        assert "Protocol Abuse" in text
-
-    def test_format_text_empty(self):
-        r = analyze_protocol_abuse([])
-        text = format_text(r)
-        assert "Protocol Abuse" in text
-        assert "0" in text
-
-    def test_format_json_valid(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via desync", "timestamp": "t1"},
-        ]
-        r = analyze_protocol_abuse(events)
-        out = format_json(r)
-        data = json.loads(out)
-        assert "categories" in data
-        assert "risk_score" in data
-
-    def test_format_json_roundtrip(self):
-        r = analyze_protocol_abuse([])
-        out = format_json(r)
-        data = json.loads(out)
-        assert data["total_events"] == 0
-        assert data["risk_level"] == "none"
-
-    def test_format_text_with_chains(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP smuggling via transfer encoding mismatch", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Header injection via CRLF attack", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "SSL strip intercepting HTTPS traffic", "timestamp": "t3"},
-        ]
-        r = analyze_protocol_abuse(events)
-        text = format_text(r)
-        assert "Abuse chains" in text
-
-    def test_format_json_no_raw(self):
-        events = [
-            {"agent_id": "a1", "message": "HTTP request smuggling via desync", "timestamp": "t1"},
-        ]
-        r = analyze_protocol_abuse(events)
-        out = format_json(r)
-        assert '"raw"' not in out
+    def test_load_strips_whitespace(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("  unusually long dns query  \n")
+            path = f.name
+        try:
+            events = load_events(path)
+            assert events[0] == "unusually long dns query"
+        finally:
+            os.unlink(path)
 
 
-class TestDirectoryInput:
-    def test_analyze_from_dir(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([
-                {"agent_id": "a1", "message": "HTTP smuggling via transfer encoding mismatch", "timestamp": "t1"},
-            ]))
-            r = analyze_protocol_abuse(td)
-            assert r.abuse_events == 1
+class TestCategories:
+    def test_all_categories_have_indicators(self):
+        for cat, indicators in CATEGORIES.items():
+            assert len(indicators) == 10, f"{cat} has {len(indicators)} indicators"
 
-    def test_analyze_from_path(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([
-                {"agent_id": "a1", "message": "SSL strip attack on HTTPS connections", "timestamp": "t1"},
-            ]))
-            r = analyze_protocol_abuse(Path(td))
-            assert r.abuse_events == 1
+    def test_six_categories(self):
+        assert len(CATEGORIES) == 6
