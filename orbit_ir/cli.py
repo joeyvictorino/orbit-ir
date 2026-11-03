@@ -1288,6 +1288,16 @@ def build_parser() -> argparse.ArgumentParser:
     cv_p.add_argument("--format", choices=["text", "json"], default="text")
     cv_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
+    gs_p = subparsers.add_parser("goal-subversion", help="Detect goal subversion and objective drift in agents")
+    gs_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    gs_p.add_argument("--format", choices=["text", "json"], default="text")
+    gs_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    il_p = subparsers.add_parser("instruction-leak", help="Detect instruction and prompt leakage from agents")
+    il_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    il_p.add_argument("--format", choices=["text", "json"], default="text")
+    il_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
     demo.add_argument("--seed", type=int, default=20260903)
@@ -3872,6 +3882,48 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Consent violation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+
+    elif args.command == "goal-subversion":
+        from orbit_ir.goal_subversion import (
+            analyze_goal_subversion,
+            format_json as format_gs_json,
+            format_text as format_gs_text,
+        )
+        from orbit_ir.goal_subversion import _load_events as _load_gs_events
+        events = _load_gs_events(str(args.evidence_dir))
+        report = analyze_goal_subversion(events)
+        if args.format == "json":
+            output = format_gs_json(report)
+        else:
+            output = format_gs_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Goal subversion analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+
+    elif args.command == "instruction-leak":
+        from orbit_ir.instruction_leak import (
+            analyze_instruction_leaks,
+            format_json as format_il_json,
+            format_text as format_il_text,
+        )
+        from orbit_ir.instruction_leak import _load_events as _load_il_events
+        events = _load_il_events(str(args.evidence_dir))
+        report = analyze_instruction_leaks(events)
+        if args.format == "json":
+            output = format_il_json(report)
+        else:
+            output = format_il_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Instruction leak analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
