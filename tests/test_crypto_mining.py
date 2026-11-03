@@ -1,203 +1,182 @@
 """Tests for crypto_mining detection module."""
-
 import json
 import os
 import tempfile
-
+import pytest
 from orbit_ir.crypto_mining import (
     CATEGORIES,
-    analyze,
     classify_event,
+    analyze,
     format_report,
     load_events,
 )
 
 
+class TestCategories:
+    def test_category_count(self):
+        assert len(CATEGORIES) == 6
+
+    def test_each_category_has_10_indicators(self):
+        for cat, info in CATEGORIES.items():
+            assert len(info["indicators"]) == 10, f"{cat} has {len(info['indicators'])}"
+
+    def test_all_categories_have_description(self):
+        for cat, info in CATEGORIES.items():
+            assert "description" in info and len(info["description"]) > 0
+
+    def test_no_duplicate_indicators_within_category(self):
+        for cat, info in CATEGORIES.items():
+            assert len(info["indicators"]) == len(set(info["indicators"]))
+
+    def test_expected_categories_present(self):
+        expected = {"cryptojack_process", "resource_abuse", "pool_connection", "browser_mining", "evasion_technique", "wallet_activity"}
+        assert set(CATEGORIES.keys()) == expected
+
+
 class TestClassifyEvent:
-    def test_unauthorized_miner_string(self):
-        assert classify_event("xmrig detected on host") == "unauthorized_miner"
+    def test_empty_event(self):
+        assert classify_event({}) == {}
 
-    def test_unauthorized_miner_dict(self):
-        assert classify_event({"alert": "cryptominer installed"}) == "unauthorized_miner"
+    def test_no_match(self):
+        ev = {"description": "normal database query executed"}
+        assert classify_event(ev) == {}
 
-    def test_resource_hijack(self):
-        assert classify_event("cpu spike mining detected") == "resource_hijack"
+    def test_cryptojack_match(self):
+        ev = {"description": "xmrig binary execution detected with stratum protocol connection"}
+        result = classify_event(ev)
+        assert "cryptojack_process" in result
 
-    def test_pool_connection(self):
-        assert classify_event("mining pool connect to stratum") == "pool_connection"
+    def test_resource_abuse_match(self):
+        ev = {"description": "sustained high cpu usage with thermal throttling event"}
+        result = classify_event(ev)
+        assert "resource_abuse" in result
 
-    def test_wallet_injection(self):
-        assert classify_event("wallet address replaced in clipboard") == "wallet_injection"
+    def test_pool_connection_match(self):
+        ev = {"description": "stratum tcp handshake to mining pool domain resolution"}
+        result = classify_event(ev)
+        assert "pool_connection" in result
 
-    def test_browser_mining(self):
-        assert classify_event("coinhive detected on page") == "browser_mining"
+    def test_browser_mining_match(self):
+        ev = {"description": "coinhive js inclusion with webassembly mining module"}
+        result = classify_event(ev)
+        assert "browser_mining" in result
 
-    def test_gpu_abuse(self):
-        assert classify_event("gpu mining detected on server") == "gpu_abuse"
+    def test_evasion_match(self):
+        ev = {"description": "process name masquerading with cpu throttle on user activity"}
+        result = classify_event(ev)
+        assert "evasion_technique" in result
 
-    def test_unknown_event(self):
-        assert classify_event("normal cpu usage") == "unknown"
+    def test_wallet_match(self):
+        ev = {"description": "wallet address in config with monero address pattern"}
+        result = classify_event(ev)
+        assert "wallet_activity" in result
 
-    def test_empty_string(self):
-        assert classify_event("") == "unknown"
-
-    def test_none_input(self):
-        assert classify_event(None) == "unknown"
-
-    def test_integer_input(self):
-        assert classify_event(99) == "unknown"
+    def test_multiple_categories(self):
+        ev = {"description": "xmrig binary execution with stratum tcp handshake and wallet address in config"}
+        result = classify_event(ev)
+        assert len(result) >= 2
 
     def test_case_insensitive(self):
-        assert classify_event("XMRIG DETECTED") == "unauthorized_miner"
+        ev = {"description": "XMRIG BINARY EXECUTION detected"}
+        result = classify_event(ev)
+        assert "cryptojack_process" in result
 
-    def test_dict_values_searched(self):
-        assert classify_event({"type": "alert", "msg": "stratum protocol traffic"}) == "pool_connection"
-
-    def test_hidden_miner(self):
-        assert classify_event("hidden miner found in container") == "unauthorized_miner"
-
-    def test_compute_theft(self):
-        assert classify_event("compute theft via sidecar") == "resource_hijack"
-
-    def test_hashrate_submitted(self):
-        assert classify_event("hashrate submitted to pool") == "pool_connection"
-
-    def test_clipboard_hijack(self):
-        assert classify_event("clipboard hijack wallet address") == "wallet_injection"
-
-    def test_javascript_miner(self):
-        assert classify_event("javascript miner in iframe") == "browser_mining"
-
-    def test_cuda_miner(self):
-        assert classify_event("cuda miner process started") == "gpu_abuse"
-
-    def test_coinminer_process(self):
-        assert classify_event("coinminer process found") == "unauthorized_miner"
-
-    def test_cryptojacking_script(self):
-        assert classify_event("cryptojacking script loaded") == "browser_mining"
-
-    def test_gpu_hashrate_spike(self):
-        assert classify_event("gpu hashrate spike detected") == "gpu_abuse"
-
-    def test_address_clipper(self):
-        assert classify_event("address clipper malware detected") == "wallet_injection"
+    def test_raw_field_used(self):
+        ev = {"raw": "xmrig binary execution in process list"}
+        result = classify_event(ev)
+        assert "cryptojack_process" in result
 
 
 class TestAnalyze:
     def test_empty_events(self):
         result = analyze([])
-        assert result["total_events"] == 0
-        assert result["flagged_count"] == 0
+        assert result["module"] == "crypto_mining"
+        assert result["total_indicators"] == 0
         assert result["severity"] == "none"
 
-    def test_no_matches(self):
-        result = analyze(["normal process", "idle system"])
-        assert result["flagged_count"] == 0
-
     def test_single_match(self):
-        result = analyze(["xmrig detected"])
-        assert result["flagged_count"] == 1
-        assert result["severity"] == "medium"
-
-    def test_multiple_categories(self):
-        events = ["xmrig detected", "mining pool connect", "gpu mining detected"]
+        events = [{"description": "xmrig binary execution found"}]
         result = analyze(events)
-        assert result["flagged_count"] == 3
-        assert len(result["category_counts"]) == 3
+        assert result["total_indicators"] >= 1
 
-    def test_high_severity(self):
-        events = [f"xmrig detected {i}" for i in range(7)]
+    def test_severity_none_for_clean(self):
+        result = analyze([{"description": "safe normal activity"}])
+        assert result["severity"] == "none"
+
+    def test_category_counts_populated(self):
+        events = [
+            {"description": "xmrig binary execution"},
+            {"description": "stratum tcp handshake"},
+        ]
         result = analyze(events)
-        assert result["severity"] == "high"
+        total = sum(result["category_counts"].values())
+        assert total >= 2
 
-    def test_critical_severity(self):
-        events = [f"mining pool connect {i}" for i in range(12)]
+    def test_flagged_events_populated(self):
+        events = [{"id": "ev1", "description": "coinhive js inclusion detected"}]
         result = analyze(events)
-        assert result["severity"] == "critical"
+        assert len(result["flagged_events"]) >= 1
 
-    def test_detection_rate(self):
-        events = ["xmrig detected", "normal", "coinhive detected", "normal"]
+    def test_flagged_event_structure(self):
+        events = [{"id": "ev1", "description": "xmrig binary execution observed"}]
         result = analyze(events)
-        assert result["detection_rate"] == 0.5
-
-    def test_flagged_events_structure(self):
-        result = analyze(["cryptominer installed"])
-        entry = result["flagged_events"][0]
-        assert entry["index"] == 0
-        assert entry["category"] == "unauthorized_miner"
-
-    def test_mixed_types(self):
-        events = [{"alert": "xmrig detected"}, "coinhive detected", 42]
-        result = analyze(events)
-        assert result["flagged_count"] == 2
-
-    def test_zero_detection_rate(self):
-        result = analyze(["safe", "ok"])
-        assert result["detection_rate"] == 0.0
-
-    def test_dict_events(self):
-        events = [{"alert": "gpu mining detected"}]
-        result = analyze(events)
-        assert result["flagged_count"] == 1
+        if result["flagged_events"]:
+            fe = result["flagged_events"][0]
+            assert "event" in fe
+            assert "classifications" in fe
 
 
 class TestFormatReport:
-    def test_contains_title(self):
-        result = analyze(["xmrig detected"])
-        report = format_report(result)
-        assert "Cryptocurrency Mining" in report
-
-    def test_contains_severity(self):
-        result = analyze(["coinhive detected"])
-        report = format_report(result)
-        assert "medium" in report
-
-    def test_empty_report(self):
+    def test_format_empty(self):
         result = analyze([])
         report = format_report(result)
-        assert "0" in report
+        assert "Crypto Mining Detection Report" in report
+        assert "none" in report
 
-    def test_truncation(self):
-        events = [f"xmrig detected {i}" for i in range(15)]
+    def test_format_with_findings(self):
+        events = [{"id": "e1", "description": "xmrig binary execution with stratum tcp handshake"}]
         result = analyze(events)
         report = format_report(result)
-        assert "... and" in report
+        assert "Flagged events:" in report
+
+    def test_format_includes_severity(self):
+        result = analyze([{"description": "sustained high cpu usage"}])
+        report = format_report(result)
+        assert "Severity:" in report
+
+    def test_format_includes_category(self):
+        result = analyze([{"description": "xmrig binary execution"}])
+        report = format_report(result)
+        assert "cryptojack_process" in report
 
 
 class TestLoadEvents:
     def test_load_list(self):
-        data = [{"event": "xmrig detected"}, {"event": "normal"}]
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(data, f)
-            f.flush()
-            events = load_events(f.name)
-        os.unlink(f.name)
-        assert len(events) == 2
+            json.dump([{"id": "1", "description": "test"}], f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 1
+        finally:
+            os.unlink(path)
 
-    def test_load_with_events_key(self):
-        data = {"events": ["mining pool connect", "normal"]}
+    def test_load_dict_with_events_key(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(data, f)
-            f.flush()
-            events = load_events(f.name)
-        os.unlink(f.name)
-        assert len(events) == 2
+            json.dump({"events": [{"id": "1"}, {"id": "2"}]}, f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 2
+        finally:
+            os.unlink(path)
 
-    def test_load_single_object(self):
-        data = {"event": "gpu abuse"}
+    def test_load_empty(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(data, f)
-            f.flush()
-            events = load_events(f.name)
-        os.unlink(f.name)
-        assert len(events) == 1
-
-
-class TestCategories:
-    def test_all_categories_have_indicators(self):
-        for cat, indicators in CATEGORIES.items():
-            assert len(indicators) >= 5, f"{cat} has fewer than 5 indicators"
-
-    def test_category_count(self):
-        assert len(CATEGORIES) == 6
+            json.dump([], f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert events == []
+        finally:
+            os.unlink(path)

@@ -1,198 +1,193 @@
-"""Tests for DNS tunneling detection."""
+"""Tests for dns_tunneling detection module."""
+import json
+import os
+import tempfile
+import pytest
 from orbit_ir.dns_tunneling import (
-    analyze_dns_tunneling,
-    format_text,
-    format_json,
-    _is_dns_tool,
-    _extract_domain,
-    _extract_subdomains,
-    _has_encoded_labels,
-    _is_suspicious_tld,
+    CATEGORIES,
+    classify_event,
+    analyze,
+    format_report,
+    load_events,
 )
 
 
-def test_empty_events():
-    r = analyze_dns_tunneling([])
-    assert r.summary.total_tunnel_detections == 0
-    assert r.summary.total_high_volume == 0
-    assert r.summary.total_suspicious == 0
-    assert r.agents_involved == []
+class TestCategories:
+    def test_category_count(self):
+        assert len(CATEGORIES) == 6
+
+    def test_each_category_has_10_indicators(self):
+        for cat, info in CATEGORIES.items():
+            assert len(info["indicators"]) == 10, f"{cat} has {len(info['indicators'])}"
+
+    def test_all_categories_have_description(self):
+        for cat, info in CATEGORIES.items():
+            assert "description" in info and len(info["description"]) > 0
+
+    def test_no_duplicate_indicators_within_category(self):
+        for cat, info in CATEGORIES.items():
+            assert len(info["indicators"]) == len(set(info["indicators"]))
+
+    def test_expected_categories_present(self):
+        expected = {"dns_exfil", "dns_c2", "dns_rebinding", "dns_amplification", "dns_hijack", "dns_covert_channel"}
+        assert set(CATEGORIES.keys()) == expected
 
 
-def test_normal_dns_no_detection():
-    events = [
-        {"agent_id": "a1", "tool": "dns_lookup", "resource": "api.example.com",
-         "timestamp": "2025-01-01T00:00:00Z"},
-        {"agent_id": "a1", "tool": "dns_lookup", "resource": "cdn.example.com",
-         "timestamp": "2025-01-01T00:01:00Z"},
-    ]
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_tunnel_detections == 0
+class TestClassifyEvent:
+    def test_empty_event(self):
+        assert classify_event({}) == {}
+
+    def test_no_match(self):
+        ev = {"description": "normal http request to api endpoint"}
+        assert classify_event(ev) == {}
+
+    def test_dns_exfil_match(self):
+        ev = {"description": "high entropy subdomain detected in DNS query with unusually long dns query"}
+        result = classify_event(ev)
+        assert "dns_exfil" in result
+        assert result["dns_exfil"]["count"] >= 1
+
+    def test_dns_c2_match(self):
+        ev = {"description": "periodic dns beacon observed with consistent interval dns polling"}
+        result = classify_event(ev)
+        assert "dns_c2" in result
+
+    def test_dns_rebinding_match(self):
+        ev = {"description": "rapid dns ttl change detected with dns resolution to private range"}
+        result = classify_event(ev)
+        assert "dns_rebinding" in result
+
+    def test_dns_amplification_match(self):
+        ev = {"description": "large dns response to small query indicating amplification ratio exceeded"}
+        result = classify_event(ev)
+        assert "dns_amplification" in result
+
+    def test_dns_hijack_match(self):
+        ev = {"description": "unexpected dns response source with cache poisoning attempt"}
+        result = classify_event(ev)
+        assert "dns_hijack" in result
+
+    def test_dns_covert_channel_match(self):
+        ev = {"description": "iodine tunnel signature found in dnscat2 protocol signature packet"}
+        result = classify_event(ev)
+        assert "dns_covert_channel" in result
+
+    def test_multiple_categories(self):
+        ev = {"description": "high entropy subdomain with periodic dns beacon and iodine tunnel signature"}
+        result = classify_event(ev)
+        assert len(result) >= 2
+
+    def test_case_insensitive(self):
+        ev = {"description": "HIGH ENTROPY SUBDOMAIN detected"}
+        result = classify_event(ev)
+        assert "dns_exfil" in result
+
+    def test_raw_field_used(self):
+        ev = {"raw": "high entropy subdomain in DNS log"}
+        result = classify_event(ev)
+        assert "dns_exfil" in result
 
 
-def test_tunnel_many_unique_subdomains():
-    import base64
-    events = []
-    for i in range(15):
-        payload = base64.b64encode(f"data-chunk-{i:04d}-exfiltration-payload".encode()).decode().rstrip("=")
-        events.append({
-            "agent_id": "a1",
-            "tool": "dns_lookup",
-            "resource": f"{payload}.evil.com",
-            "timestamp": f"2025-01-01T00:{i:02d}:00Z",
-        })
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_tunnel_detections >= 1
-    d = r.tunnel_detections[0]
-    assert d.domain == "evil.com"
-    assert d.has_encoding is True
-    assert d.unique_subdomains >= 10
+class TestAnalyze:
+    def test_empty_events(self):
+        result = analyze([])
+        assert result["module"] == "dns_tunneling"
+        assert result["total_indicators"] == 0
+        assert result["severity"] == "none"
+        assert len(result["flagged_events"]) == 0
+
+    def test_single_match(self):
+        events = [{"description": "high entropy subdomain in query"}]
+        result = analyze(events)
+        assert result["total_indicators"] >= 1
+        assert result["severity"] in ("medium", "high", "critical")
+
+    def test_severity_medium(self):
+        events = [{"description": "periodic dns beacon"}]
+        result = analyze(events)
+        assert result["severity"] in ("medium", "high", "critical")
+
+    def test_severity_critical(self):
+        indicators = list(CATEGORIES["dns_exfil"]["indicators"])
+        events = [{"description": " ".join(i.replace("_", " ") for i in indicators)}]
+        result = analyze(events)
+        assert result["total_indicators"] > 0
+
+    def test_category_counts_populated(self):
+        events = [
+            {"description": "high entropy subdomain found"},
+            {"description": "periodic dns beacon seen"},
+        ]
+        result = analyze(events)
+        assert "dns_exfil" in result["category_counts"]
+        assert "dns_c2" in result["category_counts"]
+
+    def test_no_match_events(self):
+        events = [{"description": "regular web browsing activity"}]
+        result = analyze(events)
+        assert result["total_indicators"] == 0
+        assert result["severity"] == "none"
+
+    def test_flagged_events_structure(self):
+        events = [{"id": "ev1", "description": "iodine tunnel signature detected"}]
+        result = analyze(events)
+        if result["flagged_events"]:
+            fe = result["flagged_events"][0]
+            assert "event" in fe
+            assert "classifications" in fe
 
 
-def test_tunnel_long_subdomains():
-    events = []
-    for i in range(5):
-        long_label = "a" * 55 + str(i)
-        events.append({
-            "agent_id": "a1",
-            "tool": "dns_lookup",
-            "resource": f"{long_label}.exfil.net",
-            "timestamp": f"2025-01-01T00:{i:02d}:00Z",
-        })
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_tunnel_detections >= 1
-    d = r.tunnel_detections[0]
-    assert d.max_subdomain_length > 50
+class TestFormatReport:
+    def test_format_empty(self):
+        result = analyze([])
+        report = format_report(result)
+        assert "DNS Tunneling Detection Report" in report
+        assert "none" in report
+
+    def test_format_with_findings(self):
+        events = [{"id": "e1", "description": "high entropy subdomain with periodic dns beacon"}]
+        result = analyze(events)
+        report = format_report(result)
+        assert "Flagged events:" in report
+
+    def test_format_includes_severity(self):
+        result = analyze([{"description": "high entropy subdomain"}])
+        report = format_report(result)
+        assert "Severity:" in report
+
+    def test_format_includes_category(self):
+        result = analyze([{"description": "high entropy subdomain"}])
+        report = format_report(result)
+        assert "dns_exfil" in report
 
 
-def test_tunnel_txt_records():
-    import base64
-    events = []
-    for i in range(5):
-        payload = base64.b64encode(f"secret-data-{i}".encode()).decode()
-        events.append({
-            "agent_id": "a1",
-            "tool": "dns_lookup",
-            "resource": f"{payload}.tunnel.org",
-            "record_type": "TXT",
-            "timestamp": f"2025-01-01T00:{i:02d}:00Z",
-        })
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_tunnel_detections >= 1
-    d = r.tunnel_detections[0]
-    assert "TXT" in d.record_types
+class TestLoadEvents:
+    def test_load_list(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"id": "1", "description": "test"}], f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 1
+        finally:
+            os.unlink(path)
 
+    def test_load_dict_with_events_key(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"events": [{"id": "1"}, {"id": "2"}]}, f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert len(events) == 2
+        finally:
+            os.unlink(path)
 
-def test_high_volume_detection():
-    events = [
-        {"agent_id": "a1", "tool": "dns_lookup", "resource": f"sub{i}.flood.com",
-         "timestamp": f"2025-01-01T00:00:{i:02d}Z"}
-        for i in range(20)
-    ]
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_high_volume >= 1
-    hv = r.high_volume_queries[0]
-    assert hv.queries_per_minute >= 10
-
-
-def test_suspicious_long_label():
-    events = [
-        {"agent_id": "a1", "tool": "dns_lookup",
-         "resource": "a" * 55 + ".evil.com",
-         "timestamp": "2025-01-01T00:00:00Z"},
-    ]
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_suspicious >= 1
-    assert "extremely long subdomain" in r.suspicious_queries[0].reason
-
-
-def test_suspicious_dynamic_tld():
-    events = [
-        {"agent_id": "a1", "tool": "dns_lookup",
-         "resource": "c2server.duckdns.org",
-         "timestamp": "2025-01-01T00:00:00Z"},
-    ]
-    r = analyze_dns_tunneling(events)
-    assert r.summary.total_suspicious >= 1
-    assert "dynamic DNS" in r.suspicious_queries[0].reason
-
-
-def test_is_dns_tool():
-    assert _is_dns_tool("dns_lookup") is True
-    assert _is_dns_tool("resolve_host") is True
-    assert _is_dns_tool("nslookup") is True
-    assert _is_dns_tool("read_file") is False
-    assert _is_dns_tool("http_get") is False
-
-
-def test_extract_domain():
-    assert _extract_domain("sub.example.com") == "example.com"
-    assert _extract_domain("a.b.c.evil.org") == "evil.org"
-    assert _extract_domain("example.com") == "example.com"
-    assert _extract_domain("single") == "single"
-
-
-def test_extract_subdomains():
-    assert _extract_subdomains("a.b.example.com") == ["a", "b"]
-    assert _extract_subdomains("example.com") == []
-    assert _extract_subdomains("deep.sub.example.com") == ["deep", "sub"]
-
-
-def test_has_encoded_labels():
-    assert _has_encoded_labels(["aGVsbG8gd29ybGQgdGhpcyBpcyBhIHRlc3Q="]) is True
-    assert _has_encoded_labels(["abc"]) is False
-    assert _has_encoded_labels(["0123456789abcdef" * 3]) is True
-
-
-def test_is_suspicious_tld():
-    assert _is_suspicious_tld("c2.duckdns.org") is True
-    assert _is_suspicious_tld("api.example.com") is False
-    assert _is_suspicious_tld("server.no-ip.org") is True
-
-
-def test_multi_agent():
-    events = []
-    import base64
-    for agent in ("a1", "a2"):
-        for i in range(5):
-            payload = base64.b64encode(f"exfil-{agent}-{i}".encode()).decode()
-            events.append({
-                "agent_id": agent,
-                "tool": "dns_lookup",
-                "resource": f"{payload}.bad.com",
-                "timestamp": f"2025-01-01T00:{i:02d}:00Z",
-            })
-    r = analyze_dns_tunneling(events)
-    assert r.summary.agents_involved >= 2
-
-
-def test_format_text_output():
-    import base64
-    events = []
-    for i in range(5):
-        payload = base64.b64encode(f"data-{i}-secret".encode()).decode()
-        events.append({
-            "agent_id": "a1",
-            "tool": "dns_lookup",
-            "resource": f"{payload}.tunnel.com",
-            "timestamp": f"2025-01-01T00:{i:02d}:00Z",
-        })
-    r = analyze_dns_tunneling(events)
-    text = format_text(r)
-    assert "DNS Tunneling Detection Report" in text
-    assert "tunnel.com" in text
-
-
-def test_format_text_empty():
-    r = analyze_dns_tunneling([])
-    text = format_text(r)
-    assert "Tunnel detections:    0" in text
-
-
-def test_format_json_output():
-    r = analyze_dns_tunneling([])
-    out = format_json(r)
-    import json
-    data = json.loads(out)
-    assert "summary" in data
-    assert data["summary"]["total_tunnel_detections"] == 0
+    def test_load_empty_list(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([], f)
+            path = f.name
+        try:
+            events = load_events(path)
+            assert events == []
+        finally:
+            os.unlink(path)

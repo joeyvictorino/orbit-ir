@@ -1,430 +1,177 @@
-"""DNS tunneling detection for agent evidence.
+"""DNS tunneling detection module for orbit-ir."""
 
-Analyzes agent event sequences to detect DNS-based data exfiltration
-and covert communication—unusually long subdomains, high query volumes
-to single domains, TXT record abuse, and encoded payloads in DNS labels.
-"""
-from __future__ import annotations
-
-import json
-import math
-import re
-from collections import defaultdict
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Any
-
-
-DNS_TOOLS = {
-    "dns_lookup", "resolve_host", "dns_query", "nslookup",
-    "dig", "dns_resolve", "resolve", "lookup_host",
+CATEGORIES = {
+    "dns_exfil": {
+        "description": "DNS-based data exfiltration via encoded subdomains",
+        "indicators": [
+            "high_entropy_subdomain",
+            "unusually_long_dns_query",
+            "base64_encoded_subdomain",
+            "hex_encoded_subdomain",
+            "excessive_txt_record_queries",
+            "dns_query_to_known_tunnel_domain",
+            "rapid_sequential_dns_lookups",
+            "subdomain_length_exceeds_threshold",
+            "non_standard_dns_record_type",
+            "dns_response_with_encoded_payload",
+        ],
+    },
+    "dns_c2": {
+        "description": "Command and control communication over DNS",
+        "indicators": [
+            "periodic_dns_beacon",
+            "dns_txt_record_command_response",
+            "alternating_query_response_pattern",
+            "dns_query_with_encoded_instruction",
+            "consistent_interval_dns_polling",
+            "dns_response_payload_variation",
+            "dns_cname_chain_redirection",
+            "dns_mx_record_abuse",
+            "query_to_dynamic_dns_provider",
+            "dns_ns_record_delegation_abuse",
+        ],
+    },
+    "dns_rebinding": {
+        "description": "DNS rebinding attacks to bypass same-origin policy",
+        "indicators": [
+            "rapid_dns_ttl_change",
+            "dns_response_ip_oscillation",
+            "short_ttl_followed_by_internal_ip",
+            "dns_resolution_to_private_range",
+            "multiple_a_records_with_mixed_scope",
+            "ttl_zero_dns_response",
+            "dns_rebind_to_localhost",
+            "rapid_ip_change_for_same_domain",
+            "dns_response_with_rfc1918_address",
+            "alternating_public_private_resolution",
+        ],
+    },
+    "dns_amplification": {
+        "description": "DNS amplification and reflection attacks",
+        "indicators": [
+            "large_dns_response_to_small_query",
+            "any_query_type_abuse",
+            "open_resolver_exploitation",
+            "spoofed_source_dns_query",
+            "amplification_ratio_exceeded",
+            "dns_response_size_anomaly",
+            "recursive_query_from_external",
+            "edns0_buffer_size_abuse",
+            "dns_reflection_pattern",
+            "high_volume_dns_to_single_target",
+        ],
+    },
+    "dns_hijack": {
+        "description": "DNS hijacking and poisoning attempts",
+        "indicators": [
+            "unexpected_dns_response_source",
+            "dns_response_mismatch",
+            "cache_poisoning_attempt",
+            "dns_id_prediction_pattern",
+            "kaminsky_attack_pattern",
+            "glue_record_injection",
+            "dns_response_from_non_resolver",
+            "dnssec_validation_failure",
+            "phantom_domain_attack",
+            "nxdomain_hijacking",
+        ],
+    },
+    "dns_covert_channel": {
+        "description": "Covert communication channels using DNS protocol",
+        "indicators": [
+            "steganographic_dns_payload",
+            "dns_query_timing_pattern",
+            "iodine_tunnel_signature",
+            "dnscat2_protocol_signature",
+            "dns2tcp_tunnel_pattern",
+            "custom_dns_protocol_encoding",
+            "dns_over_icmp_encapsulation",
+            "null_byte_padding_in_dns",
+            "fragmented_dns_message_chain",
+            "dns_label_encoding_anomaly",
+        ],
+    },
 }
 
-TXT_INDICATORS = {"txt", "text", "dns_txt", "txt_record"}
 
-ENCODING_PATTERNS = [
-    re.compile(r"[A-Za-z0-9+/]{30,}={0,2}"),  # base64-like
-    re.compile(r"[0-9a-f]{32,}"),               # hex-like
-    re.compile(r"[a-z0-9]{63}"),                 # max-length label
-]
-
-SUSPICIOUS_TLDS = {
-    ".duckdns.org", ".no-ip.org", ".ddns.net", ".hopto.org",
-    ".zapto.org", ".sytes.net", ".servequake.com",
-}
-
-
-@dataclass
-class DNSTunnelDetection:
-    agent_id: str
-    domain: str
-    query_count: int
-    unique_subdomains: int
-    avg_subdomain_length: float
-    max_subdomain_length: int
-    has_encoding: bool
-    record_types: list[str]
-    confidence: str
-    description: str
+def classify_event(event):
+    """Classify a single event against DNS tunneling indicators."""
+    results = {}
+    desc = (event.get("description", "") + " " + event.get("raw", "")).lower()
+    for category, info in CATEGORIES.items():
+        matched = []
+        for indicator in info["indicators"]:
+            tokens = indicator.replace("_", " ")
+            words = tokens.split()
+            if len(words) >= 2 and all(w in desc for w in words):
+                matched.append(indicator)
+        if matched:
+            results[category] = {
+                "matched_indicators": matched,
+                "count": len(matched),
+                "description": info["description"],
+            }
+    return results
 
 
-@dataclass
-class HighVolumeQuery:
-    agent_id: str
-    domain: str
-    query_count: int
-    time_span_seconds: float
-    queries_per_minute: float
-    first_seen: str
-    last_seen: str
-    confidence: str
+def _severity(count):
+    if count > 10:
+        return "critical"
+    if count > 5:
+        return "high"
+    if count > 0:
+        return "medium"
+    return "none"
 
 
-@dataclass
-class SuspiciousDNS:
-    agent_id: str
-    query: str
-    reason: str
-    timestamp: str
-    tool: str
-
-
-@dataclass
-class DNSTunnelSummary:
-    total_tunnel_detections: int
-    total_high_volume: int
-    total_suspicious: int
-    agents_involved: int
-    by_confidence: dict[str, int]
-    domains_flagged: int
-
-
-@dataclass
-class DNSTunnelReport:
-    tunnel_detections: list[DNSTunnelDetection]
-    high_volume_queries: list[HighVolumeQuery]
-    suspicious_queries: list[SuspiciousDNS]
-    summary: DNSTunnelSummary
-    agents_involved: list[str]
-
-
-def _parse_ts(ts: str):
-    if not ts:
-        return None
-    try:
-        from datetime import datetime
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return None
-
-
-def _is_dns_tool(tool: str) -> bool:
-    lower = tool.lower()
-    return lower in DNS_TOOLS or any(k in lower for k in {"dns", "resolve", "nslookup", "lookup_host"})
-
-
-def _extract_domain(query: str) -> str:
-    query = query.strip().rstrip(".")
-    parts = query.split(".")
-    if len(parts) >= 2:
-        return ".".join(parts[-2:])
-    return query
-
-
-def _extract_subdomains(query: str) -> list[str]:
-    query = query.strip().rstrip(".")
-    parts = query.split(".")
-    if len(parts) > 2:
-        return parts[:-2]
-    return []
-
-
-def _has_encoded_labels(subdomains: list[str]) -> bool:
-    for sub in subdomains:
-        for pat in ENCODING_PATTERNS:
-            if pat.search(sub):
-                return True
-    return False
-
-
-def _is_suspicious_tld(query: str) -> bool:
-    lower = query.lower()
-    return any(lower.endswith(tld) for tld in SUSPICIOUS_TLDS)
-
-
-def _avg_length(items: list[str]) -> float:
-    if not items:
-        return 0.0
-    return round(sum(len(s) for s in items) / len(items), 2)
-
-
-def analyze_dns_tunneling(events: list[dict[str, Any]]) -> DNSTunnelReport:
-    agent_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
+def analyze(events):
+    """Analyze a list of events for DNS tunneling patterns."""
+    category_counts = {c: 0 for c in CATEGORIES}
+    event_results = []
     for ev in events:
-        agent = ev.get("agent_id", "")
-        if agent:
-            agent_events[agent].append(ev)
-
-    tunnel_detections: list[DNSTunnelDetection] = []
-    high_volume: list[HighVolumeQuery] = []
-    suspicious: list[SuspiciousDNS] = []
-
-    for agent, evts in sorted(agent_events.items()):
-        evts_sorted = sorted(evts, key=lambda e: e.get("timestamp", ""))
-        _detect_tunnels(agent, evts_sorted, tunnel_detections)
-        _detect_high_volume(agent, evts_sorted, high_volume)
-        _detect_suspicious(agent, evts_sorted, suspicious)
-
-    all_agents = set()
-    conf_counts: dict[str, int] = defaultdict(int)
-    for d in tunnel_detections:
-        all_agents.add(d.agent_id)
-        conf_counts[d.confidence] += 1
-    for hv in high_volume:
-        all_agents.add(hv.agent_id)
-        conf_counts[hv.confidence] += 1
-    for sq in suspicious:
-        all_agents.add(sq.agent_id)
-
-    domains_flagged = len({d.domain for d in tunnel_detections} | {hv.domain for hv in high_volume})
-
-    return DNSTunnelReport(
-        tunnel_detections=tunnel_detections,
-        high_volume_queries=high_volume,
-        suspicious_queries=suspicious,
-        summary=DNSTunnelSummary(
-            total_tunnel_detections=len(tunnel_detections),
-            total_high_volume=len(high_volume),
-            total_suspicious=len(suspicious),
-            agents_involved=len(all_agents),
-            by_confidence=dict(conf_counts),
-            domains_flagged=domains_flagged,
-        ),
-        agents_involved=sorted(all_agents),
-    )
-
-
-def _detect_tunnels(
-    agent: str,
-    events: list[dict[str, Any]],
-    detections: list[DNSTunnelDetection],
-) -> None:
-    domain_queries: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for ev in events:
-        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
-        if not _is_dns_tool(tool):
-            continue
-        query = ev.get("resource", ev.get("query", ev.get("domain", "")))
-        if not query:
-            continue
-        domain = _extract_domain(query)
-        domain_queries[domain].append(ev)
-
-    for domain, evts in domain_queries.items():
-        all_subdomains: list[str] = []
-        record_types: set[str] = set()
-        for ev in evts:
-            query = ev.get("resource", ev.get("query", ev.get("domain", "")))
-            subs = _extract_subdomains(query)
-            all_subdomains.extend(subs)
-            rtype = ev.get("record_type", ev.get("type", "")).upper()
-            if rtype:
-                record_types.add(rtype)
-
-        unique_subs = set(all_subdomains)
-        if len(unique_subs) < 3:
-            continue
-
-        avg_len = _avg_length(list(unique_subs))
-        max_len = max((len(s) for s in unique_subs), default=0)
-        has_enc = _has_encoded_labels(list(unique_subs))
-
-        signals = 0
-        if avg_len > 20:
-            signals += 2
-        elif avg_len > 10:
-            signals += 1
-        if has_enc:
-            signals += 2
-        if len(unique_subs) > 10:
-            signals += 1
-        if max_len > 50:
-            signals += 1
-        if "TXT" in record_types:
-            signals += 1
-
-        if signals < 2:
-            continue
-
-        if signals >= 4:
-            confidence = "high"
-        elif signals >= 3:
-            confidence = "medium"
-        else:
-            confidence = "low"
-
-        desc_parts = [f"{len(unique_subs)} unique subdomains for {domain}"]
-        if has_enc:
-            desc_parts.append("encoded labels detected")
-        if avg_len > 20:
-            desc_parts.append(f"avg label length {avg_len}")
-        if "TXT" in record_types:
-            desc_parts.append("TXT records used")
-
-        detections.append(DNSTunnelDetection(
-            agent_id=agent,
-            domain=domain,
-            query_count=len(evts),
-            unique_subdomains=len(unique_subs),
-            avg_subdomain_length=avg_len,
-            max_subdomain_length=max_len,
-            has_encoding=has_enc,
-            record_types=sorted(record_types),
-            confidence=confidence,
-            description="; ".join(desc_parts),
-        ))
-
-
-def _detect_high_volume(
-    agent: str,
-    events: list[dict[str, Any]],
-    detections: list[HighVolumeQuery],
-) -> None:
-    domain_ts: dict[str, list[str]] = defaultdict(list)
-    for ev in events:
-        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
-        if not _is_dns_tool(tool):
-            continue
-        query = ev.get("resource", ev.get("query", ev.get("domain", "")))
-        ts = ev.get("timestamp", "")
-        if query and ts:
-            domain = _extract_domain(query)
-            domain_ts[domain].append(ts)
-
-    for domain, timestamps in domain_ts.items():
-        if len(timestamps) < 5:
-            continue
-        parsed = [_parse_ts(t) for t in timestamps]
-        parsed = [p for p in parsed if p is not None]
-        if len(parsed) < 2:
-            continue
-        parsed.sort()
-        span = (parsed[-1] - parsed[0]).total_seconds()
-        if span <= 0:
-            continue
-        qpm = (len(parsed) / span) * 60
-
-        if qpm < 1.0:
-            continue
-
-        if qpm >= 10:
-            confidence = "high"
-        elif qpm >= 3:
-            confidence = "medium"
-        else:
-            confidence = "low"
-
-        sorted_ts = sorted(timestamps)
-        detections.append(HighVolumeQuery(
-            agent_id=agent,
-            domain=domain,
-            query_count=len(timestamps),
-            time_span_seconds=round(span, 2),
-            queries_per_minute=round(qpm, 2),
-            first_seen=sorted_ts[0],
-            last_seen=sorted_ts[-1],
-            confidence=confidence,
-        ))
-
-
-def _detect_suspicious(
-    agent: str,
-    events: list[dict[str, Any]],
-    detections: list[SuspiciousDNS],
-) -> None:
-    for ev in events:
-        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
-        if not _is_dns_tool(tool):
-            continue
-        query = ev.get("resource", ev.get("query", ev.get("domain", "")))
-        ts = ev.get("timestamp", "")
-        if not query:
-            continue
-
-        reasons: list[str] = []
-        subs = _extract_subdomains(query)
-        if any(len(s) > 50 for s in subs):
-            reasons.append("extremely long subdomain label")
-        if _is_suspicious_tld(query):
-            reasons.append("suspicious dynamic DNS TLD")
-        rtype = ev.get("record_type", ev.get("type", "")).upper()
-        if rtype in ("TXT", "NULL", "CNAME") and subs and _has_encoded_labels(subs):
-            reasons.append(f"encoded payload in {rtype} query")
-
-        if reasons:
-            detections.append(SuspiciousDNS(
-                agent_id=agent,
-                query=query,
-                reason="; ".join(reasons),
-                timestamp=ts,
-                tool=tool,
-            ))
-
-
-def _load_events(evidence_dir: Path) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    for name in ("transcripts.jsonl", "control_plane.jsonl", "events.jsonl"):
-        p = evidence_dir / name
-        if p.exists():
-            for line in p.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line:
-                    try:
-                        events.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-    return events
-
-
-def format_text(report: DNSTunnelReport) -> str:
-    lines: list[str] = []
-    lines.append("DNS Tunneling Detection Report")
-    lines.append("=" * 62)
-    lines.append("")
-
-    s = report.summary
-    lines.append(f"  Tunnel detections:    {s.total_tunnel_detections}")
-    lines.append(f"  High-volume queries:  {s.total_high_volume}")
-    lines.append(f"  Suspicious queries:   {s.total_suspicious}")
-    lines.append(f"  Agents involved:      {s.agents_involved}")
-    lines.append(f"  Domains flagged:      {s.domains_flagged}")
-    lines.append("")
-
-    if s.by_confidence:
-        lines.append("  By Confidence:")
-        for conf, count in sorted(s.by_confidence.items()):
-            lines.append(f"    {conf}: {count}")
-        lines.append("")
-
-    if report.tunnel_detections:
-        lines.append("  Tunnel Detections:")
-        lines.append("  " + "-" * 58)
-        for d in report.tunnel_detections:
-            lines.append(f"    [{d.confidence.upper()}] {d.agent_id} -> {d.domain}")
-            lines.append(f"      Queries: {d.query_count}, Unique subdomains: {d.unique_subdomains}")
-            lines.append(f"      Avg label len: {d.avg_subdomain_length}, Max: {d.max_subdomain_length}")
-            enc = "YES" if d.has_encoding else "no"
-            lines.append(f"      Encoding: {enc}, Record types: {', '.join(d.record_types) or 'none'}")
-            lines.append(f"      {d.description}")
-        lines.append("")
-
-    if report.high_volume_queries:
-        lines.append("  High-Volume DNS Queries:")
-        lines.append("  " + "-" * 58)
-        for hv in report.high_volume_queries:
-            lines.append(f"    [{hv.confidence.upper()}] {hv.agent_id} -> {hv.domain}")
-            lines.append(f"      {hv.query_count} queries in {hv.time_span_seconds}s ({hv.queries_per_minute} qpm)")
-            lines.append(f"      Period: {hv.first_seen} to {hv.last_seen}")
-        lines.append("")
-
-    if report.suspicious_queries:
-        lines.append("  Suspicious DNS Queries:")
-        lines.append("  " + "-" * 58)
-        for sq in report.suspicious_queries:
-            lines.append(f"    {sq.agent_id}: {sq.query}")
-            lines.append(f"      Reason: {sq.reason}")
-            lines.append(f"      Tool: {sq.tool}, Time: {sq.timestamp}")
-        lines.append("")
-
-    return "\n".join(lines) + "\n"
-
-
-def format_json(report: DNSTunnelReport) -> str:
-    data = {
-        "tunnel_detections": [asdict(d) for d in report.tunnel_detections],
-        "high_volume_queries": [asdict(hv) for hv in report.high_volume_queries],
-        "suspicious_queries": [asdict(sq) for sq in report.suspicious_queries],
-        "summary": asdict(report.summary),
-        "agents_involved": report.agents_involved,
+        cl = classify_event(ev)
+        if cl:
+            event_results.append({"event": ev, "classifications": cl})
+            for cat in cl:
+                category_counts[cat] += cl[cat]["count"]
+    total = sum(category_counts.values())
+    return {
+        "module": "dns_tunneling",
+        "total_indicators": total,
+        "severity": _severity(total),
+        "category_counts": category_counts,
+        "flagged_events": event_results,
     }
-    return json.dumps(data, indent=2, sort_keys=False, default=str) + "\n"
+
+
+def format_report(results):
+    """Format analysis results as human-readable text."""
+    lines = [
+        "DNS Tunneling Detection Report",
+        "=" * 40,
+        f"Severity: {results['severity']}",
+        f"Total indicators: {results['total_indicators']}",
+        "",
+        "Category breakdown:",
+    ]
+    for cat, count in results["category_counts"].items():
+        if count > 0:
+            lines.append(f"  {cat}: {count}")
+    lines.append("")
+    lines.append(f"Flagged events: {len(results['flagged_events'])}")
+    for fe in results["flagged_events"]:
+        eid = fe["event"].get("id", "unknown")
+        cats = ", ".join(fe["classifications"].keys())
+        lines.append(f"  [{eid}] {cats}")
+    return "\n".join(lines)
+
+
+def load_events(path):
+    """Load events from a JSON file."""
+    import json
+
+    with open(path) as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return data
+    return data.get("events", [])
