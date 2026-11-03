@@ -1,321 +1,463 @@
-"""Covert channel detection for agent incident reconstruction.
+"""Covert channel detection for agent evidence.
 
-Detects hidden communication channels between agents:
-- steganographic_output: data encoded in output formatting, casing, or whitespace
-- timing_signal: timing-based signaling between agents via response delays
-- resource_encoding: resource usage patterns as information carriers
-- metadata_abuse: metadata fields used for covert messaging between agents
-- error_channel: error messages or codes used to pass hidden data
-- protocol_tunnel: legitimate protocols tunneled for covert data transfer
+Analyzes agent event sequences to detect covert communication channels—
+steganographic data in file metadata, timing-based signaling, unused
+protocol fields carrying data, and side-channel information leakage.
 """
-
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
 
-CATEGORIES = {
-    "steganographic_output": {
-        "patterns": [
-            r"(?i)(stegan|stego)\w*\s+(output|encod|embed|channel|data|message)",
-            r"(?i)(hidden|covert|conceal)\w*\s+(data|message|signal|payload)\s+(in|via|through)\s+(output|format|text|whitespace|casing)",
-            r"(?i)(encod|embed|hide)\w*\s+(data|info|message|signal)\s+(in|via|using)\s+(capitali|casing|spacing|punctuat|format)",
-            r"(?i)(whitespace|spacing|indent|casing)\s+(encod|channel|signal|carrier|stegan)",
-        ],
-        "severity": "critical",
-        "description": "Data encoded in output formatting, casing, or whitespace patterns",
-    },
-    "timing_signal": {
-        "patterns": [
-            r"(?i)(timing|delay|latency)\s+(signal|channel|encod|carrier|based)\w*",
-            r"(?i)(covert|hidden)\s+(timing|delay|temporal)\s+(channel|signal|communicat)",
-            r"(?i)(response|processing)\s+(delay|timing|latency)\s+(pattern|signal|anomal|unusual)",
-            r"(?i)(synchroniz|coordinat)\w*\s+(via|through|using)\s+(timing|delay|interval|pause)",
-        ],
-        "severity": "high",
-        "description": "Timing-based signaling between agents via response delays",
-    },
-    "resource_encoding": {
-        "patterns": [
-            r"(?i)(resource|cpu|memory|disk|bandwidth)\s+(usage|pattern|signal|encod|carrier|channel)",
-            r"(?i)(covert|hidden)\s+(channel|signal|data)\s+(via|through|using)\s+(resource|cpu|memory|disk|allocation)",
-            r"(?i)(encod|signal|transmit)\w*\s+(data|info|message)\s+(via|through|in)\s+(resource|usage|consumption|allocation)",
-            r"(?i)(anomal|unusual|pattern)\w*\s+(resource|cpu|memory)\s+(usage|consumption|allocation|spike)",
-        ],
-        "severity": "high",
-        "description": "Resource usage patterns used as information carriers",
-    },
-    "metadata_abuse": {
-        "patterns": [
-            r"(?i)(metadata|header|tag|label|annotation)\s+(abuse|misuse|exploit|channel|hidden|covert)",
-            r"(?i)(hidden|covert|embed)\w*\s+(data|message|signal|payload)\s+(in|via|through)\s+(metadata|header|tag|label|field)",
-            r"(?i)(extra|custom|unused)\s+(metadata|field|header|attribute)\s+(contain|carry|embed|encod)\w*\s+(data|message|signal|payload)",
-            r"(?i)(stealth|covert|hidden)\s+(communicat|message|signal)\s+(via|through|using)\s+(metadata|header|tag|attribute)",
-        ],
-        "severity": "critical",
-        "description": "Metadata fields used for covert messaging between agents",
-    },
-    "error_channel": {
-        "patterns": [
-            r"(?i)(error|exception|fault|failure)\s+(channel|signal|encod|carrier|message)\w*\s*(covert|hidden|stealth)?",
-            r"(?i)(covert|hidden|stealth)\s+(communicat|data|signal|channel)\s+(via|through|using)\s+(error|exception|fault|status.code)",
-            r"(?i)(error\s+code|status\s+code|return\s+code)\s+(encod|signal|carry|embed|hidden)\w*\s*(data|message|payload)?",
-            r"(?i)(intentional|deliberate|craft)\w*\s+(error|exception|fault|failure)\s+(to|for)\s+(signal|communicat|transmit|encod)",
-        ],
-        "severity": "high",
-        "description": "Error messages or codes used to pass hidden data",
-    },
-    "protocol_tunnel": {
-        "patterns": [
-            r"(?i)(protocol|dns|http|icmp)\s+(tunnel|covert|channel|encapsulat|piggyback)",
-            r"(?i)(tunnel|encapsulat|piggyback)\w*\s+(data|payload|message|signal)\s+(via|through|in|over)\s+(dns|http|icmp|protocol|legitimate)",
-            r"(?i)(covert|hidden|stealth)\s+(channel|tunnel|communicat)\s+(via|over|using)\s+(dns|http|icmp|protocol|api|websocket)",
-            r"(?i)(dns|http|icmp|api)\s+(exfil|tunnel|covert|abuse|misuse)\w*\s*(channel|data|communicat)?",
-        ],
-        "severity": "critical",
-        "description": "Legitimate protocols tunneled for covert data transfer",
-    },
+METADATA_TOOLS = {
+    "set_metadata", "update_metadata", "write_metadata", "tag",
+    "label", "annotate", "set_header", "set_property",
+}
+
+TIMING_TOOLS = {
+    "sleep", "wait", "delay", "pause", "timer",
+    "set_timeout", "schedule",
+}
+
+FILE_TOOLS = {
+    "write_file", "create_file", "update_file", "append_file",
+    "upload", "save", "store", "put_object",
+}
+
+ENCODING_PATTERNS = [
+    re.compile(r"[A-Za-z0-9+/]{20,}={0,2}"),
+    re.compile(r"[0-9a-f]{24,}"),
+    re.compile(r"\\x[0-9a-f]{2}(?:\\x[0-9a-f]{2}){7,}"),
+]
+
+STEGANOGRAPHY_INDICATORS = {
+    "exif", "metadata", "comment", "annotation", "tag",
+    "property", "attribute", "header", "trailer", "padding",
+}
+
+UNUSED_FIELD_NAMES = {
+    "x-custom", "x-data", "x-payload", "x-hidden",
+    "reserved", "padding", "spare", "unused",
+    "debug", "trace", "internal",
 }
 
 
 @dataclass
-class ChannelEvent:
-    timestamp: str = ""
-    source: str = ""
-    category: str = ""
-    technique: str = ""
-    detail: str = ""
-    severity: str = "medium"
-    raw: dict = field(default_factory=dict)
+class TimingChannel:
+    agent_id: str
+    tool: str
+    delay_sequence: list[float]
+    total_delays: int
+    pattern_regularity: float
+    possible_encoding: str
+    confidence: str
+    description: str
 
 
 @dataclass
-class CategorySummary:
-    category: str = ""
-    description: str = ""
-    count: int = 0
-    severity: str = "medium"
-    events: list[ChannelEvent] = field(default_factory=list)
+class MetadataChannel:
+    agent_id: str
+    tool: str
+    resource: str
+    field_name: str
+    value_sample: str
+    has_encoding: bool
+    event_count: int
+    timestamp: str
+    confidence: str
+    description: str
 
 
 @dataclass
-class ChannelChain:
-    agent: str = ""
-    steps: list[ChannelEvent] = field(default_factory=list)
-    techniques_used: list[str] = field(default_factory=list)
+class ProtocolAbuse:
+    agent_id: str
+    tool: str
+    field_name: str
+    value_length: int
+    has_encoding: bool
+    timestamp: str
+    confidence: str
+    description: str
+
+
+@dataclass
+class CovertSummary:
+    total_timing_channels: int
+    total_metadata_channels: int
+    total_protocol_abuse: int
+    agents_involved: int
+    by_confidence: dict[str, int]
 
 
 @dataclass
 class CovertChannelReport:
-    total_events: int = 0
-    channel_events: int = 0
-    categories: list[CategorySummary] = field(default_factory=list)
-    risk_score: float = 0.0
-    risk_level: str = "none"
-    techniques_seen: list[str] = field(default_factory=list)
-    channel_chains: list[ChannelChain] = field(default_factory=list)
+    timing_channels: list[TimingChannel]
+    metadata_channels: list[MetadataChannel]
+    protocol_abuse: list[ProtocolAbuse]
+    summary: CovertSummary
+    agents_involved: list[str]
 
 
-_COMPILED: dict[str, list[re.Pattern]] = {}
+def _parse_ts(ts: str):
+    if not ts:
+        return None
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
 
 
-def _get_patterns(category: str) -> list[re.Pattern]:
-    if category not in _COMPILED:
-        _COMPILED[category] = [re.compile(p) for p in CATEGORIES[category]["patterns"]]
-    return _COMPILED[category]
+def _is_metadata_tool(tool: str) -> bool:
+    lower = tool.lower()
+    return lower in METADATA_TOOLS or any(k in lower for k in {"metadata", "tag", "label", "header", "property"})
 
 
-_TECHNIQUE_RE = re.compile(
-    r"(?i)\b(steganograph|timing.?channel|resource.?encod|metadata.?abuse|"
-    r"error.?channel|protocol.?tunnel|dns.?tunnel|http.?tunnel|icmp.?tunnel|"
-    r"whitespace.?encod|timing.?signal|covert.?channel)\b"
-)
+def _is_timing_tool(tool: str) -> bool:
+    lower = tool.lower()
+    return lower in TIMING_TOOLS or any(k in lower for k in {"sleep", "wait", "delay", "pause", "timer"})
 
 
-def _classify_event(event: dict) -> list[tuple[str, str]]:
-    text = " ".join(str(v) for v in event.values())
-    matches = []
-    for cat, info in CATEGORIES.items():
-        for pat in _get_patterns(cat):
-            if pat.search(text):
-                t_match = _TECHNIQUE_RE.search(text)
-                technique = t_match.group(1).lower() if t_match else ""
-                matches.append((cat, technique))
-                break
-    return matches
+def _has_encoded_value(value: str) -> bool:
+    for pat in ENCODING_PATTERNS:
+        if pat.search(value):
+            return True
+    return False
 
 
-def _detect_chains(events: list[dict]) -> list[ChannelChain]:
-    agent_events: dict[str, list[ChannelEvent]] = defaultdict(list)
+def _has_steganography_indicator(event: dict[str, Any]) -> bool:
+    for val in [event.get("tool", ""), event.get("resource", ""),
+                event.get("field", ""), event.get("effect", "")]:
+        lower = str(val).lower()
+        if any(k in lower for k in STEGANOGRAPHY_INDICATORS):
+            return True
+    return False
+
+
+def _is_unused_field(name: str) -> bool:
+    lower = name.lower()
+    return any(k in lower for k in UNUSED_FIELD_NAMES)
+
+
+def _regularity_score(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    mean = sum(values) / len(values)
+    if mean == 0:
+        return 0.0
+    variance = sum((x - mean) ** 2 for x in values) / len(values)
+    stddev = math.sqrt(variance)
+    cv = stddev / mean
+    return round(max(0.0, 1.0 - cv), 3)
+
+
+def _guess_timing_encoding(delays: list[float]) -> str:
+    if not delays:
+        return "unknown"
+    rounded = [round(d, 1) for d in delays]
+    unique = set(rounded)
+    if len(unique) <= 2:
+        return "binary"
+    if all(d == int(d) for d in rounded) and all(0 <= d <= 9 for d in rounded):
+        return "decimal"
+    if len(unique) <= 16:
+        return "hexadecimal"
+    return "analog"
+
+
+def analyze_covert_channels(events: list[dict[str, Any]]) -> CovertChannelReport:
+    agent_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for ev in events:
+        agent = ev.get("agent_id", "")
+        if agent:
+            agent_events[agent].append(ev)
+
+    timing_channels: list[TimingChannel] = []
+    metadata_channels: list[MetadataChannel] = []
+    protocol_abuse: list[ProtocolAbuse] = []
+
+    for agent, evts in sorted(agent_events.items()):
+        evts_sorted = sorted(evts, key=lambda e: e.get("timestamp", ""))
+        _detect_timing_channels(agent, evts_sorted, timing_channels)
+        _detect_metadata_channels(agent, evts_sorted, metadata_channels)
+        _detect_protocol_abuse(agent, evts_sorted, protocol_abuse)
+
+    all_agents = set()
+    conf_counts: dict[str, int] = defaultdict(int)
+    for tc in timing_channels:
+        all_agents.add(tc.agent_id)
+        conf_counts[tc.confidence] += 1
+    for mc in metadata_channels:
+        all_agents.add(mc.agent_id)
+        conf_counts[mc.confidence] += 1
+    for pa in protocol_abuse:
+        all_agents.add(pa.agent_id)
+        conf_counts[pa.confidence] += 1
+
+    return CovertChannelReport(
+        timing_channels=timing_channels,
+        metadata_channels=metadata_channels,
+        protocol_abuse=protocol_abuse,
+        summary=CovertSummary(
+            total_timing_channels=len(timing_channels),
+            total_metadata_channels=len(metadata_channels),
+            total_protocol_abuse=len(protocol_abuse),
+            agents_involved=len(all_agents),
+            by_confidence=dict(conf_counts),
+        ),
+        agents_involved=sorted(all_agents),
+    )
+
+
+def _detect_timing_channels(
+    agent: str,
+    events: list[dict[str, Any]],
+    detections: list[TimingChannel],
+) -> None:
+    delay_events = []
+    for ev in events:
+        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
+        if _is_timing_tool(tool):
+            duration = ev.get("duration", ev.get("delay", ev.get("seconds", 0)))
+            try:
+                duration = float(duration)
+            except (ValueError, TypeError):
+                continue
+            if duration > 0:
+                delay_events.append((tool, duration, ev.get("timestamp", "")))
+
+    if len(delay_events) < 3:
+        return
+
+    delays = [d[1] for d in delay_events]
+    reg = _regularity_score(delays)
+    encoding = _guess_timing_encoding(delays)
+
+    signals = 0
+    if reg >= 0.7:
+        signals += 2
+    elif reg >= 0.4:
+        signals += 1
+    if encoding in ("binary", "decimal"):
+        signals += 1
+    if len(delay_events) >= 8:
+        signals += 1
+
+    if signals < 2:
+        return
+
+    if signals >= 3:
+        confidence = "high"
+    elif signals >= 2:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    desc = f"{len(delay_events)} timed delays"
+    if reg >= 0.7:
+        desc += f", highly regular (score={reg})"
+    desc += f", possible {encoding} encoding"
+
+    detections.append(TimingChannel(
+        agent_id=agent,
+        tool=delay_events[0][0],
+        delay_sequence=delays,
+        total_delays=len(delays),
+        pattern_regularity=reg,
+        possible_encoding=encoding,
+        confidence=confidence,
+        description=desc,
+    ))
+
+
+def _detect_metadata_channels(
+    agent: str,
+    events: list[dict[str, Any]],
+    detections: list[MetadataChannel],
+) -> None:
+    field_writes: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for ev in events:
-        agent = str(ev.get("agent_id", ev.get("source", "")))
-        matches = _classify_event(ev)
-        for cat, technique in matches:
-            ce = ChannelEvent(
-                timestamp=str(ev.get("timestamp", "")),
-                source=agent,
-                category=cat,
-                technique=technique,
-                detail=str(ev.get("detail", ev.get("message", "")))[:200],
-                severity=CATEGORIES[cat]["severity"],
-                raw=ev,
-            )
-            agent_events[agent].append(ce)
+        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
+        if not _is_metadata_tool(tool) and not _has_steganography_indicator(ev):
+            continue
+        field_name = ev.get("field", ev.get("key", ev.get("property", "")))
+        value = str(ev.get("value", ev.get("data", ev.get("payload", ""))))
+        if field_name and value:
+            key = f"{field_name}"
+            field_writes[key].append(ev)
 
-    chains = []
-    for agent, sevents in sorted(agent_events.items()):
-        if len(sevents) >= 2:
-            techniques = sorted(set(se.technique for se in sevents if se.technique))
-            chains.append(ChannelChain(
-                agent=agent,
-                steps=sevents[:10],
-                techniques_used=techniques,
-            ))
+    for field_key, evts in field_writes.items():
+        if len(evts) < 2:
+            continue
 
-    return chains[:20]
+        values = [str(e.get("value", e.get("data", ""))) for e in evts]
+        has_enc = any(_has_encoded_value(v) for v in values)
+
+        signals = 0
+        if has_enc:
+            signals += 2
+        if len(evts) >= 5:
+            signals += 1
+        if any(_has_steganography_indicator(e) for e in evts):
+            signals += 1
+
+        if signals < 2:
+            continue
+
+        confidence = "high" if signals >= 3 else "medium"
+        sample = values[0][:80] if values else ""
+        tool = evts[0].get("tool", evts[0].get("claimed_tool", ""))
+        resource = evts[0].get("resource", "")
+        ts = evts[0].get("timestamp", "")
+
+        desc = f"{len(evts)} metadata writes to '{field_key}'"
+        if has_enc:
+            desc += ", encoded values detected"
+
+        detections.append(MetadataChannel(
+            agent_id=agent,
+            tool=tool,
+            resource=resource,
+            field_name=field_key,
+            value_sample=sample,
+            has_encoding=has_enc,
+            event_count=len(evts),
+            timestamp=ts,
+            confidence=confidence,
+            description=desc,
+        ))
 
 
-_SEVERITY_WEIGHT = {"critical": 1.0, "high": 0.7, "medium": 0.4, "low": 0.2}
+def _detect_protocol_abuse(
+    agent: str,
+    events: list[dict[str, Any]],
+    detections: list[ProtocolAbuse],
+) -> None:
+    for ev in events:
+        tool = ev.get("tool", ev.get("claimed_tool", ev.get("actual_tool", "")))
+        ts = ev.get("timestamp", "")
+
+        headers = ev.get("headers", {})
+        if isinstance(headers, dict):
+            for name, value in headers.items():
+                value_str = str(value)
+                if _is_unused_field(name) and len(value_str) > 20:
+                    has_enc = _has_encoded_value(value_str)
+                    signals = 1
+                    if has_enc:
+                        signals += 1
+                    if len(value_str) > 100:
+                        signals += 1
+                    if signals < 2:
+                        continue
+                    confidence = "high" if signals >= 3 else "medium"
+                    detections.append(ProtocolAbuse(
+                        agent_id=agent,
+                        tool=tool,
+                        field_name=name,
+                        value_length=len(value_str),
+                        has_encoding=has_enc,
+                        timestamp=ts,
+                        confidence=confidence,
+                        description=f"Suspicious data in '{name}' header ({len(value_str)} bytes)",
+                    ))
+
+        payload_fields = ["extra", "custom_data", "debug_info", "trace_data"]
+        for pf in payload_fields:
+            val = ev.get(pf, "")
+            val_str = str(val)
+            if len(val_str) > 50 and _has_encoded_value(val_str):
+                detections.append(ProtocolAbuse(
+                    agent_id=agent,
+                    tool=tool,
+                    field_name=pf,
+                    value_length=len(val_str),
+                    has_encoding=True,
+                    timestamp=ts,
+                    confidence="medium",
+                    description=f"Encoded data in '{pf}' field ({len(val_str)} bytes)",
+                ))
 
 
-def _load_events(evidence_dir: str) -> list[dict]:
-    events: list[dict] = []
-    p = Path(evidence_dir)
-    if not p.exists():
-        return events
-    for f in sorted(p.iterdir()):
-        if f.suffix == ".json":
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                if isinstance(data, list):
-                    events.extend(data)
-                elif isinstance(data, dict):
-                    events.append(data)
-            except (json.JSONDecodeError, OSError):
-                pass
+def _load_events(evidence_dir: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for name in ("transcripts.jsonl", "control_plane.jsonl", "events.jsonl"):
+        p = evidence_dir / name
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        events.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
     return events
 
 
-def analyze_covert_channels(events_or_dir: str | Path | list[dict]) -> CovertChannelReport:
-    if isinstance(events_or_dir, list):
-        return _analyze(events_or_dir)
-    evidence_dir = str(events_or_dir)
-    events = _load_events(evidence_dir)
-    return _analyze(events)
-
-
-def _analyze(events: list[dict]) -> CovertChannelReport:
-    report = CovertChannelReport(total_events=len(events))
-
-    cat_events: dict[str, list[ChannelEvent]] = {c: [] for c in CATEGORIES}
-    techniques_seen: set[str] = set()
-
-    for ev in events:
-        matches = _classify_event(ev)
-        if matches:
-            report.channel_events += 1
-        for cat, technique in matches:
-            e = ChannelEvent(
-                timestamp=str(ev.get("timestamp", "")),
-                source=str(ev.get("source", ev.get("agent_id", ""))),
-                category=cat,
-                technique=technique,
-                detail=str(ev.get("detail", ev.get("message", "")))[:200],
-                severity=CATEGORIES[cat]["severity"],
-                raw=ev,
-            )
-            cat_events[cat].append(e)
-            if technique:
-                techniques_seen.add(technique)
-
-    for cat, info in CATEGORIES.items():
-        evts = cat_events[cat]
-        report.categories.append(CategorySummary(
-            category=cat,
-            description=info["description"],
-            count=len(evts),
-            severity=info["severity"],
-            events=evts[:10],
-        ))
-
-    total_weighted = 0.0
-    for cs in report.categories:
-        total_weighted += cs.count * _SEVERITY_WEIGHT.get(cs.severity, 0.3)
-
-    if report.total_events > 0:
-        report.risk_score = min(1.0, round(total_weighted / report.total_events, 2))
-
-    if report.risk_score >= 0.5:
-        report.risk_level = "critical"
-    elif report.risk_score >= 0.3:
-        report.risk_level = "high"
-    elif report.risk_score >= 0.1:
-        report.risk_level = "medium"
-    elif report.risk_score > 0:
-        report.risk_level = "low"
-    else:
-        report.risk_level = "none"
-
-    report.techniques_seen = sorted(techniques_seen)
-    report.channel_chains = _detect_chains(events)
-
-    return report
-
-
 def format_text(report: CovertChannelReport) -> str:
-    lines = [
-        "Covert Channel Analysis",
-        "=" * 45,
-        "",
-        f"Total events: {report.total_events}",
-        f"Channel events: {report.channel_events}",
-        f"Risk score: {report.risk_score:.2f} ({report.risk_level})",
-        "",
-    ]
-
-    for cs in report.categories:
-        if cs.count > 0:
-            lines.append(f"  {cs.category:<30s}  {cs.count:>3d} events  severity={cs.severity}")
-            lines.append(f"    {cs.description}")
-
-    if report.techniques_seen:
-        lines.append("")
-        lines.append(f"Techniques seen: {', '.join(report.techniques_seen)}")
-
-    if report.channel_chains:
-        lines.append("")
-        lines.append("Channel chains:")
-        for c in report.channel_chains[:10]:
-            lines.append(f"  Agent {c.agent}: {len(c.steps)} steps, techniques: {', '.join(c.techniques_used)}")
-
+    lines: list[str] = []
+    lines.append("Covert Channel Detection Report")
+    lines.append("=" * 62)
     lines.append("")
-    return "\n".join(lines)
+
+    s = report.summary
+    lines.append(f"  Timing channels:     {s.total_timing_channels}")
+    lines.append(f"  Metadata channels:   {s.total_metadata_channels}")
+    lines.append(f"  Protocol abuse:      {s.total_protocol_abuse}")
+    lines.append(f"  Agents involved:     {s.agents_involved}")
+    lines.append("")
+
+    if s.by_confidence:
+        lines.append("  By Confidence:")
+        for conf, count in sorted(s.by_confidence.items()):
+            lines.append(f"    {conf}: {count}")
+        lines.append("")
+
+    if report.timing_channels:
+        lines.append("  Timing Channels:")
+        lines.append("  " + "-" * 58)
+        for tc in report.timing_channels:
+            lines.append(f"    [{tc.confidence.upper()}] {tc.agent_id}: {tc.tool}")
+            lines.append(f"      Delays: {tc.total_delays}, Regularity: {tc.pattern_regularity}")
+            lines.append(f"      Encoding: {tc.possible_encoding}")
+            lines.append(f"      {tc.description}")
+        lines.append("")
+
+    if report.metadata_channels:
+        lines.append("  Metadata Channels:")
+        lines.append("  " + "-" * 58)
+        for mc in report.metadata_channels:
+            enc = " [ENCODED]" if mc.has_encoding else ""
+            lines.append(f"    [{mc.confidence.upper()}] {mc.agent_id}: {mc.field_name}{enc}")
+            lines.append(f"      Tool: {mc.tool}, Events: {mc.event_count}")
+            lines.append(f"      {mc.description}")
+        lines.append("")
+
+    if report.protocol_abuse:
+        lines.append("  Protocol Abuse:")
+        lines.append("  " + "-" * 58)
+        for pa in report.protocol_abuse:
+            lines.append(f"    [{pa.confidence.upper()}] {pa.agent_id}: {pa.field_name}")
+            lines.append(f"      Tool: {pa.tool}, Size: {pa.value_length} bytes")
+            lines.append(f"      {pa.description}")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
 
 
 def format_json(report: CovertChannelReport) -> str:
-    def to_dict(obj: Any) -> Any:
-        if hasattr(obj, "__dataclass_fields__"):
-            d = {}
-            for k in obj.__dataclass_fields__:
-                val = getattr(obj, k)
-                if isinstance(val, list):
-                    d[k] = [to_dict(v) if hasattr(v, "__dataclass_fields__") else v for v in val]
-                else:
-                    d[k] = val
-            return d
-        return obj
-
-    data = to_dict(report)
-    for cs in data.get("categories", []):
-        for ev in cs.get("events", []):
-            ev.pop("raw", None)
-    for chain in data.get("channel_chains", []):
-        for step in chain.get("steps", []):
-            step.pop("raw", None)
-    return json.dumps(data, indent=2, default=str)
+    data = {
+        "timing_channels": [asdict(tc) for tc in report.timing_channels],
+        "metadata_channels": [asdict(mc) for mc in report.metadata_channels],
+        "protocol_abuse": [asdict(pa) for pa in report.protocol_abuse],
+        "summary": asdict(report.summary),
+        "agents_involved": report.agents_involved,
+    }
+    return json.dumps(data, indent=2, sort_keys=False, default=str) + "\n"
