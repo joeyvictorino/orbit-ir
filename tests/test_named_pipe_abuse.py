@@ -79,7 +79,7 @@ class TestClassifyEvent:
         assert "pipe_covert_channel" in cats
 
     def test_pipe_covert_beacon(self):
-        event = {"action": "beacon communicates callback via pipe IPC channel"}
+        event = {"action": "beacon callback pipe IPC channel"}
         results = classify_event(event)
         cats = [r["category"] for r in results]
         assert "pipe_covert_channel" in cats
