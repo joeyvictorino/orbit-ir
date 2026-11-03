@@ -1,53 +1,43 @@
-"""Phishing attack detection module for agent incident reconstruction."""
+"""Phishing campaign detection module for agent incident reconstruction."""
 
 import json
 
 CATEGORIES = {
     "spear_phishing": [
-        "spear phishing", "targeted phishing", "whaling attack",
-        "executive phishing", "ceo fraud", "business email compromise",
-        "bec attack", "targeted email attack", "personalized phishing",
-        "social engineering email",
+        "spear phishing attack", "targeted phishing email", "personalized phish",
+        "tailored phishing message", "spear-phishing campaign", "directed phishing attempt",
+        "targeted social engineering email", "individualized phishing", "context-aware phish",
+        "researched target phishing",
     ],
-    "credential_harvesting": [
-        "credential harvesting", "credential phishing", "login page clone",
-        "fake login", "password harvesting", "credential theft",
-        "form grabber", "keylogger phishing", "credential capture",
-        "authentication phishing",
+    "credential_harvest": [
+        "credential harvesting page", "fake login portal", "credential phishing site",
+        "password harvesting form", "credential theft landing page", "credential capture proxy",
+        "login page impersonation", "credential stealing redirect", "harvested user credentials",
+        "credential collection endpoint",
     ],
-    "url_spoofing": [
-        "url spoofing", "link spoofing", "url obfuscation",
-        "shortened url attack", "redirect chain", "open redirect exploit",
-        "url masking", "link manipulation", "deceptive url",
-        "typosquatting url",
-    ],
-    "homograph_attack": [
-        "homograph attack", "idn homograph", "punycode attack",
-        "unicode spoofing", "lookalike domain", "visual spoofing",
-        "character substitution attack", "internationalized domain attack",
-        "confusable character", "homoglyph attack",
-    ],
-    "email_impersonation": [
-        "email impersonation", "display name spoofing", "from header spoofing",
-        "email spoofing", "sender impersonation", "reply-to manipulation",
-        "domain impersonation", "brand impersonation email",
-        "cousin domain", "look-alike sender",
+    "business_email_compromise": [
+        "business email compromise", "bec attack", "ceo fraud email",
+        "wire transfer fraud email", "invoice fraud phishing", "executive impersonation email",
+        "vendor email compromise", "payment redirect fraud", "supplier invoice manipulation",
+        "financial officer impersonation",
     ],
     "smishing": [
-        "smishing", "sms phishing", "text message phishing",
-        "sms spoofing", "text scam", "mobile phishing sms",
-        "fraudulent text", "sms fraud", "text message scam",
+        "sms phishing attack", "smishing campaign", "text message phishing",
+        "malicious sms link", "fraudulent text message", "sms credential theft",
+        "mobile phishing text", "sms spoofed sender", "text message fraud scheme",
+        "cellular phishing attempt",
     ],
-    "vishing": [
-        "vishing", "voice phishing", "phone phishing",
-        "caller id spoofing", "phone scam", "voice social engineering",
-        "robocall phishing", "phone fraud", "telephone phishing",
+    "whaling": [
+        "whaling attack executive", "high-profile target phishing", "c-suite phishing attempt",
+        "executive whaling campaign", "senior management phishing", "board member phishing",
+        "vip targeted phishing", "whale phishing executive", "director-level phishing attack",
+        "executive-targeted social engineering",
     ],
-    "watering_hole": [
-        "watering hole", "watering hole attack", "strategic web compromise",
-        "compromised website", "drive-by download", "trusted site compromise",
-        "supply chain web attack", "website poisoning",
-        "legitimate site exploit", "targeted website compromise",
+    "clone_phishing": [
+        "clone phishing duplicate", "cloned email attack", "replicated email phishing",
+        "copied legitimate email phishing", "email clone with malicious link",
+        "duplicate email phishing campaign", "resent email with payload",
+        "cloned notification phishing", "forged reply phishing", "mimicked email thread attack",
     ],
 }
 
@@ -103,7 +93,7 @@ def analyze(events):
 
 def format_report(result):
     lines = [
-        "Phishing Attack Detection Report",
+        "Phishing Campaign Detection Report",
         "=" * 40,
         "",
         f"  Total events:      {result['total_events']}",
