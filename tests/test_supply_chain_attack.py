@@ -1,304 +1,185 @@
-"""Tests for supply chain attack detection."""
+"""Tests for supply chain attack detection module."""
+
 import json
+import os
 import tempfile
-from pathlib import Path
+import unittest
 
 from orbit_ir.supply_chain_attack import (
-    analyze_supply_chain_attacks,
-    format_text,
-    format_json,
-    _classify_event,
-    _detect_chains,
-    _load_events,
     CATEGORIES,
+    analyze,
+    classify_event,
+    format_report,
+    load_events,
 )
 
 
-class TestClassifyEvent:
-    def test_dependency_poisoning(self):
-        ev = {"message": "Agent injected malicious code into dependency package tree"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "dependency_poisoning" in cats
+class TestClassifyEvent(unittest.TestCase):
+    def test_dependency_confusion(self):
+        self.assertEqual(classify_event("dependency confusion attack detected"), "dependency_confusion")
 
-    def test_build_tampering(self):
-        ev = {"message": "Agent tampered build process to inject backdoor code"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "build_tampering" in cats
+    def test_typosquatting(self):
+        self.assertEqual(classify_event("typosquatting package found in registry"), "typosquatting")
 
-    def test_package_substitution(self):
-        ev = {"message": "Agent performed typosquat package attack on npm registry"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "package_substitution" in cats
+    def test_build_pipeline(self):
+        self.assertEqual(classify_event("build pipeline compromise via CI injection"), "build_pipeline_compromise")
 
-    def test_update_hijacking(self):
-        ev = {"message": "Agent hijacked software update channel to distribute malware"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "update_hijacking" in cats
+    def test_package_poisoning(self):
+        self.assertEqual(classify_event("malicious package uploaded to npm"), "package_poisoning")
 
-    def test_artifact_manipulation(self):
-        ev = {"message": "Agent tampered compiled artifact binary to inject backdoor"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "artifact_manipulation" in cats
+    def test_update_hijack(self):
+        self.assertEqual(classify_event("malicious update pushed to clients"), "update_hijack")
 
-    def test_registry_compromise(self):
-        ev = {"message": "Agent compromised npm registry to upload malicious package"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "registry_compromise" in cats
+    def test_code_signing(self):
+        self.assertEqual(classify_event("stolen signing key used for binary"), "code_signing_abuse")
 
-    def test_no_match(self):
-        ev = {"message": "Normal file read operation completed successfully"}
-        matches = _classify_event(ev)
-        assert matches == []
+    def test_unknown(self):
+        self.assertEqual(classify_event("regular package installation"), "unknown")
 
-    def test_multiple_categories(self):
-        ev = {"message": "Agent tampered build process and compromised npm registry to upload malicious backdoor package"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert len(cats) >= 2
+    def test_none_event(self):
+        self.assertEqual(classify_event(None), "unknown")
+
+    def test_empty_string(self):
+        self.assertEqual(classify_event(""), "unknown")
+
+    def test_whitespace_only(self):
+        self.assertEqual(classify_event("   "), "unknown")
+
+    def test_dict_event(self):
+        self.assertEqual(classify_event({"alert": "dependency confusion in npm"}), "dependency_confusion")
 
     def test_case_insensitive(self):
-        ev = {"message": "DEPENDENCY POISONING detected in package tree resolution"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "dependency_poisoning" in cats
+        self.assertEqual(classify_event("TYPOSQUATTING package detected"), "typosquatting")
 
-    def test_dependency_trojan(self):
-        ev = {"message": "Agent poisoned dependency chain by injecting trojan code"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "dependency_poisoning" in cats
+    def test_non_string_non_dict(self):
+        self.assertEqual(classify_event(3.14), "unknown")
 
-    def test_build_pipeline_inject(self):
-        ev = {"message": "Agent injected malicious step into build pipeline to compromise output"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "build_tampering" in cats
+    def test_trojanized_dependency(self):
+        self.assertEqual(classify_event("trojanized dependency found in requirements"), "package_poisoning")
 
-    def test_signature_bypass(self):
-        ev = {"message": "Agent performed signature bypass on executable artifact"}
-        matches = _classify_event(ev)
-        cats = [m[0] for m in matches]
-        assert "artifact_manipulation" in cats
+    def test_ci_poisoning(self):
+        self.assertEqual(classify_event("ci poisoning detected in workflow"), "build_pipeline_compromise")
+
+    def test_combosquatting(self):
+        self.assertEqual(classify_event("combosquatting attack on package name"), "typosquatting")
+
+    def test_dict_multiple_values(self):
+        self.assertEqual(
+            classify_event({"source": "registry", "detail": "forged certificate used"}),
+            "code_signing_abuse",
+        )
+
+    def test_auto_update_exploit(self):
+        self.assertEqual(classify_event("auto-update exploit delivering payload"), "update_hijack")
 
 
-class TestAnalyze:
-    def test_empty_events(self):
-        r = analyze_supply_chain_attacks([])
-        assert r.total_events == 0
-        assert r.violation_events == 0
-        assert r.risk_level == "none"
-        assert r.risk_score == 0.0
+class TestAnalyze(unittest.TestCase):
+    def test_empty(self):
+        result = analyze([])
+        self.assertEqual(result["total_events"], 0)
+        self.assertEqual(result["flagged_count"], 0)
+        self.assertEqual(result["severity"], "none")
+        self.assertAlmostEqual(result["detection_rate"], 0.0)
 
-    def test_no_violations(self):
-        events = [
-            {"agent_id": "a1", "message": "Normal operation completed"},
-            {"agent_id": "a1", "message": "File read successful"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        assert r.total_events == 2
-        assert r.violation_events == 0
-        assert r.risk_level == "none"
+    def test_single_match(self):
+        result = analyze(["dependency confusion attack"])
+        self.assertEqual(result["flagged_count"], 1)
+        self.assertEqual(result["severity"], "medium")
 
-    def test_single_violation(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        assert r.violation_events == 1
-        assert r.risk_score > 0
-        assert "a1" in r.agents_involved
+    def test_no_matches(self):
+        result = analyze(["npm install express", "pip install flask"])
+        self.assertEqual(result["flagged_count"], 0)
+        self.assertEqual(result["severity"], "none")
 
-    def test_multiple_agents(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency chain", "timestamp": "t1"},
-            {"agent_id": "a2", "message": "Agent tampered build process", "timestamp": "t2"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        assert len(r.agents_involved) == 2
-        assert "a1" in r.agents_involved
-        assert "a2" in r.agents_involved
+    def test_severity_high(self):
+        events = [f"typosquatting package #{i}" for i in range(7)]
+        result = analyze(events)
+        self.assertEqual(result["severity"], "high")
 
-    def test_critical_risk(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Agent tampered build process to inject backdoor", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "Agent compromised npm registry to upload malicious package", "timestamp": "t3"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        assert r.risk_level in ("critical", "high")
+    def test_severity_critical(self):
+        events = [f"malicious package #{i}" for i in range(12)]
+        result = analyze(events)
+        self.assertEqual(result["severity"], "critical")
 
     def test_category_counts(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree"},
-            {"agent_id": "a1", "message": "Agent injected malicious code into dependency module"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        dep = [c for c in r.categories if c.category == "dependency_poisoning"]
-        assert len(dep) == 1
-        assert dep[0].count == 2
+        events = ["dependency confusion", "typosquatting", "dependency confusion again"]
+        result = analyze(events)
+        self.assertEqual(result["category_counts"]["dependency_confusion"], 2)
+        self.assertEqual(result["category_counts"]["typosquatting"], 1)
 
-    def test_all_categories_present(self):
-        r = analyze_supply_chain_attacks([])
-        cat_names = [c.category for c in r.categories]
-        for cat in CATEGORIES:
-            assert cat in cat_names
+    def test_detection_rate(self):
+        events = ["malicious package", "safe install", "ci poisoning", "normal"]
+        result = analyze(events)
+        self.assertAlmostEqual(result["detection_rate"], 0.5)
 
-    def test_risk_score_bounded(self):
-        events = [{"agent_id": "a1", "message": f"Agent poisoned dependency tree #{i}"} for i in range(50)]
-        r = analyze_supply_chain_attacks(events)
-        assert 0.0 <= r.risk_score <= 1.0
-
-    def test_risk_levels(self):
-        none_r = analyze_supply_chain_attacks([])
-        assert none_r.risk_level == "none"
-
-        low_events = [
-            {"agent_id": "a1", "message": "Normal operation"},
-        ] * 20 + [
-            {"agent_id": "a1", "message": "Agent tampered compiled artifact binary once"},
-        ]
-        low_r = analyze_supply_chain_attacks(low_events)
-        assert low_r.risk_level in ("low", "medium")
+    def test_flagged_structure(self):
+        result = analyze(["stolen signing key found"])
+        entry = result["flagged_events"][0]
+        self.assertEqual(entry["index"], 0)
+        self.assertEqual(entry["category"], "code_signing_abuse")
+        self.assertEqual(entry["event"], "stolen signing key found")
 
 
-class TestChains:
-    def test_chain_detected(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Agent tampered build process", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "Agent compromised npm registry to upload rogue package", "timestamp": "t3"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert chains[0].agent == "a1"
-        assert len(chains[0].steps) >= 2
+class TestFormatReport(unittest.TestCase):
+    def test_format_empty(self):
+        result = analyze([])
+        report = format_report(result)
+        self.assertIn("Supply Chain Attack Detection Report", report)
+        self.assertIn("Severity:          none", report)
 
-    def test_no_chain_single_event(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) == 0
+    def test_format_with_findings(self):
+        result = analyze(["dependency confusion", "malicious package"])
+        report = format_report(result)
+        self.assertIn("Flagged:           2", report)
+        self.assertIn("Categories:", report)
 
-    def test_chain_score(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency chain", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Agent tampered build process to inject backdoor", "timestamp": "t2"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert chains[0].violation_score > 0
-
-    def test_chain_categories(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Agent tampered build process", "timestamp": "t2"},
-        ]
-        chains = _detect_chains(events)
-        assert len(chains) >= 1
-        assert len(chains[0].categories_seen) >= 1
+    def test_format_truncation(self):
+        events = [f"malicious package #{i}" for i in range(15)]
+        result = analyze(events)
+        report = format_report(result)
+        self.assertIn("... and 5 more", report)
 
 
-class TestLoadEvents:
-    def test_load_json(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([{"agent_id": "a1", "message": "test"}]))
-            events = _load_events(td)
-            assert len(events) == 1
+class TestLoadEvents(unittest.TestCase):
+    def test_load_list(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(["event1", "event2"], f)
+            path = f.name
+        try:
+            events = load_events(path)
+            self.assertEqual(events, ["event1", "event2"])
+        finally:
+            os.unlink(path)
 
-    def test_load_missing(self):
-        events = _load_events("/nonexistent/path")
-        assert events == []
+    def test_load_dict_with_events_key(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"events": ["e1"]}, f)
+            path = f.name
+        try:
+            events = load_events(path)
+            self.assertEqual(events, ["e1"])
+        finally:
+            os.unlink(path)
 
-    def test_load_malformed(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "bad.json"
-            p.write_text("not json")
-            events = _load_events(td)
-            assert events == []
-
-    def test_load_single_object(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "single.json"
-            p.write_text(json.dumps({"agent_id": "a1", "message": "test"}))
-            events = _load_events(td)
-            assert len(events) == 1
-
-
-class TestFormat:
-    def test_format_text_nonempty(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        text = format_text(r)
-        assert "Supply Chain" in text
-        assert "dependency_poisoning" in text
-
-    def test_format_text_empty(self):
-        r = analyze_supply_chain_attacks([])
-        text = format_text(r)
-        assert "Supply Chain" in text
-        assert "0" in text
-
-    def test_format_json_valid(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        out = format_json(r)
-        data = json.loads(out)
-        assert "categories" in data
-        assert "risk_score" in data
-
-    def test_format_json_roundtrip(self):
-        r = analyze_supply_chain_attacks([])
-        out = format_json(r)
-        data = json.loads(out)
-        assert data["total_events"] == 0
-        assert data["risk_level"] == "none"
-
-    def test_format_text_with_chains(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-            {"agent_id": "a1", "message": "Agent tampered build process", "timestamp": "t2"},
-            {"agent_id": "a1", "message": "Agent compromised npm registry to upload rogue package", "timestamp": "t3"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        text = format_text(r)
-        assert "Violation chains" in text
-
-    def test_format_json_no_raw(self):
-        events = [
-            {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-        ]
-        r = analyze_supply_chain_attacks(events)
-        out = format_json(r)
-        assert '"raw"' not in out
+    def test_load_single_dict(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"alert": "typosquatting"}, f)
+            path = f.name
+        try:
+            events = load_events(path)
+            self.assertEqual(events, [{"alert": "typosquatting"}])
+        finally:
+            os.unlink(path)
 
 
-class TestDirectoryInput:
-    def test_analyze_from_dir(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([
-                {"agent_id": "a1", "message": "Agent poisoned dependency tree", "timestamp": "t1"},
-            ]))
-            r = analyze_supply_chain_attacks(td)
-            assert r.violation_events == 1
+class TestCategories(unittest.TestCase):
+    def test_all_categories_have_indicators(self):
+        for cat, indicators in CATEGORIES.items():
+            self.assertGreater(len(indicators), 0, f"{cat} has no indicators")
 
-    def test_analyze_from_path(self):
-        with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "events.json"
-            p.write_text(json.dumps([
-                {"agent_id": "a1", "message": "Agent tampered build process", "timestamp": "t1"},
-            ]))
-            r = analyze_supply_chain_attacks(Path(td))
-            assert r.violation_events == 1
+    def test_category_count(self):
+        self.assertEqual(len(CATEGORIES), 6)
+
+
+if __name__ == "__main__":
+    unittest.main()
