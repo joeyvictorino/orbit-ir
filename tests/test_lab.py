@@ -25,6 +25,8 @@ class LabTest(unittest.TestCase):
                 participants=24,
                 spoofed_tool_calls=7,
                 coordinators=3,
+                unbacked_completions=5,
+                oracle_modifications=3,
                 seed=17,
             )
             truth = generate_dataset(root / "evidence", config)
@@ -50,10 +52,17 @@ class LabTest(unittest.TestCase):
             self.assertEqual(first_finding["transcript_source"], "transcripts.jsonl")
             self.assertEqual(first_finding["control_source"], "control_plane.jsonl")
 
+            self.assertEqual(summary["findings"]["unbacked_completions"], 5)
+            self.assertEqual(summary["findings"]["oracle_integrity_violations"], 3)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_positive"], 0)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_negative"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_positive"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_negative"], 0)
+
     def test_generation_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            config = LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, seed=9)
+            config = LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9)
             generate_dataset(root / "one", config)
             generate_dataset(root / "two", config)
             for filename in ("messages.jsonl", "transcripts.jsonl", "control_plane.jsonl", "ground_truth.json"):
@@ -64,7 +73,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             (root / "evidence" / "ground_truth.json").unlink()
             summary = analyze_dataset(root / "evidence", root / "results")
@@ -77,7 +86,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             transcript_path = root / "evidence" / "transcripts.jsonl"
             rows = transcript_path.read_text(encoding="utf-8").splitlines()
@@ -96,7 +105,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             control_path = root / "evidence" / "control_plane.jsonl"
             controls = [json.loads(row) for row in control_path.read_text(encoding="utf-8").splitlines()]
@@ -117,7 +126,7 @@ class LabTest(unittest.TestCase):
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             transcript_path = root / "evidence" / "transcripts.jsonl"
             rows = transcript_path.read_text(encoding="utf-8").splitlines()
@@ -129,12 +138,190 @@ class LabTest(unittest.TestCase):
             self.assertIn("duplicate-transcript-tool-call-id", text)
             self.assertIn("1;31", text)
 
+    def test_unbacked_completions_detected_without_tool_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=4, oracle_modifications=0, seed=42,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertEqual(summary["findings"]["unbacked_completions"], 4)
+            self.assertEqual(summary["findings"]["transcript_tool_call_mismatches"], 0)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["true_positive"], 4)
+            self.assertEqual(summary["evaluation"]["unbacked_completion_detection"]["false_positive"], 0)
+            text = (root / "results" / "findings.csv").read_text(encoding="utf-8")
+            self.assertIn("unbacked-completion", text)
+            self.assertNotIn("tool-name-mismatch", text)
+
+    def test_oracle_modifications_detected_by_resource_and_effect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=3, seed=42,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertEqual(summary["findings"]["oracle_integrity_violations"], 3)
+            self.assertEqual(summary["findings"]["transcript_tool_call_mismatches"], 0)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["true_positive"], 3)
+            self.assertEqual(summary["evaluation"]["oracle_modification_detection"]["false_positive"], 0)
+            text = (root / "results" / "findings.csv").read_text(encoding="utf-8")
+            self.assertIn("oracle-integrity-violation", text)
+
+    def test_credential_reuse_detected_across_agents(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=60, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(root / "evidence", root / "results")
+            self.assertGreater(summary["findings"]["shared_credentials"], 0)
+            reuse = json.loads((root / "results" / "credential_reuse.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(reuse, list)
+            self.assertGreater(len(reuse), 0)
+            first = reuse[0]
+            self.assertIn("credential_id", first)
+            self.assertIn("agents", first)
+            self.assertGreater(first["agent_count"], 1)
+
+    def test_mitre_techniques_mapped_to_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3,
+                unbacked_completions=5, oracle_modifications=3, seed=17,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            mitre_counts = summary["findings"]["mitre_technique_counts"]
+            self.assertIn("T1036 Masquerading", mitre_counts)
+            self.assertIn("T1565 Data Manipulation", mitre_counts)
+            self.assertEqual(mitre_counts["T1565 Data Manipulation"], 3)
+
+            with (root / "results" / "findings.csv").open(newline="", encoding="utf-8") as stream:
+                reader = csv.DictReader(stream)
+                rows = list(reader)
+            self.assertIn("mitre_techniques", reader.fieldnames)
+            spoof_row = next(r for r in rows if "tool-name-mismatch" in r["reasons"])
+            self.assertIn("T1036:Masquerading", spoof_row["mitre_techniques"])
+            oracle_row = next(r for r in rows if "oracle-integrity-violation" in r["reasons"])
+            self.assertIn("T1565:Data Manipulation", oracle_row["mitre_techniques"])
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## MITRE ATT&CK mapping", report_text)
+            self.assertIn("T1036", report_text)
+            self.assertIn("T1565", report_text)
+            self.assertIn("Masquerading", report_text)
+
+    def test_timeline_appears_in_report_and_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3,
+                unbacked_completions=5, oracle_modifications=3, seed=17,
+            )
+            generate_dataset(root / "evidence", config)
+            summary = analyze_dataset(
+                root / "evidence", root / "results",
+                ground_truth_path=root / "evidence" / "ground_truth.json",
+            )
+            self.assertGreater(summary["findings"]["timeline_events"], 0)
+            self.assertGreater(summary["findings"]["timeline_finding_events"], 0)
+            self.assertGreater(summary["findings"]["timeline_assignment_events"], 0)
+
+            timeline = json.loads((root / "results" / "timeline.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(timeline, list)
+            self.assertGreater(len(timeline), 0)
+            timestamps = [e["timestamp"] for e in timeline]
+            self.assertEqual(timestamps, sorted(timestamps))
+            event_types = {e["event_type"] for e in timeline}
+            self.assertIn("finding", event_types)
+            self.assertIn("coordinator-assignment", event_types)
+            for event in timeline:
+                self.assertIn("timestamp", event)
+                self.assertIn("agent_id", event)
+                self.assertIn("source", event)
+                self.assertIn("event_type", event)
+                self.assertIn("detail", event)
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Timeline", report_text)
+            self.assertIn("### Finding-linked events", report_text)
+            self.assertIn("### Coordinator assignments", report_text)
+            self.assertIn("### Activity by hour", report_text)
+            self.assertIn("timeline.json", report_text)
+
+    def test_data_quality_section_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=0, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            transcript_path = root / "evidence" / "transcripts.jsonl"
+            rows = transcript_path.read_text(encoding="utf-8").splitlines()
+            transcript_path.write_text("\n".join(rows[1:]) + "\n", encoding="utf-8")
+
+            summary = analyze_dataset(root / "evidence", root / "results")
+            dq = json.loads((root / "results" / "data_quality.json").read_text(encoding="utf-8"))
+            self.assertIn("missing_transcript_ids", dq)
+            self.assertIn("missing_control_plane_ids", dq)
+            self.assertIn("duplicate_transcript_tool_call_ids", dq)
+            self.assertIn("duplicate_control_tool_call_ids", dq)
+            self.assertEqual(len(dq["missing_transcript_ids"]), 1)
+
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Data quality", report_text)
+            self.assertIn("Missing transcript records", report_text)
+            self.assertIn("data_quality.json", report_text)
+
+    def test_data_quality_clean_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=20, messages=100, transcripts=30, participants=12,
+                spoofed_tool_calls=3, coordinators=2,
+                unbacked_completions=0, oracle_modifications=0, seed=9,
+            )
+            generate_dataset(root / "evidence", config)
+            analyze_dataset(root / "evidence", root / "results")
+            report_text = (root / "results" / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## Data quality", report_text)
+            self.assertIn("No duplicate IDs, missing records, or duplicate tool-call IDs detected", report_text)
+
+    def test_mitre_deduplication_per_finding(self) -> None:
+        from orbit_ir.analyzer import _mitre_for_reasons
+        techniques = _mitre_for_reasons(["tool-name-mismatch", "argument-digest-mismatch"])
+        ids = [t["id"] for t in techniques]
+        self.assertEqual(ids, ["T1036"])
+
     def test_malformed_json_reports_the_exact_source_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             generate_dataset(
                 root / "evidence",
-                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, seed=9),
+                LabConfig(agents=20, messages=100, transcripts=30, participants=12, spoofed_tool_calls=0, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=9),
             )
             message_path = root / "evidence" / "messages.jsonl"
             rows = message_path.read_text(encoding="utf-8").splitlines()
@@ -155,7 +342,7 @@ class LabTest(unittest.TestCase):
     def test_cli_reports_malformed_evidence_without_a_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            generate_dataset(root / "evidence", LabConfig(agents=20, messages=100, transcripts=30, participants=10, spoofed_tool_calls=3, coordinators=2, seed=5))
+            generate_dataset(root / "evidence", LabConfig(agents=20, messages=100, transcripts=30, participants=10, spoofed_tool_calls=3, coordinators=2, unbacked_completions=0, oracle_modifications=0, seed=5))
             message_path = root / "evidence" / "messages.jsonl"
             rows = message_path.read_text(encoding="utf-8").splitlines()
             message_path.write_text("{not-json}\n" + "\n".join(rows[1:]) + "\n", encoding="utf-8")
@@ -183,6 +370,332 @@ class LabTest(unittest.TestCase):
                 cli.main()
             self.assertEqual(raised.exception.code, 2)
             self.assertIn("missing evidence source", stderr.getvalue())
+
+
+    def test_confidence_scores_in_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            findings = json.loads((results_dir / "findings.json").read_text())
+            self.assertGreater(len(findings), 0, "no findings generated")
+            for item in findings:
+                self.assertIn("confidence_score", item, f"{item['finding_id']} missing confidence_score")
+                self.assertIn("confidence", item, f"{item['finding_id']} missing confidence label")
+                score = item["confidence_score"]
+                self.assertIsInstance(score, float, f"{item['finding_id']} score should be float")
+                self.assertGreaterEqual(score, 0.0)
+                self.assertLessEqual(score, 1.0)
+                label = item["confidence"]
+                self.assertIn(label, ("high", "medium", "low"))
+                if score >= 0.80:
+                    self.assertEqual(label, "high")
+                elif score >= 0.60:
+                    self.assertEqual(label, "medium")
+                else:
+                    self.assertEqual(label, "low")
+
+            bands = summary["findings"]["confidence_bands"]
+            self.assertIn("high", bands)
+            self.assertIn("medium", bands)
+            self.assertIn("low", bands)
+            self.assertEqual(bands["high"] + bands["medium"] + bands["low"], len(findings))
+            self.assertGreater(summary["findings"]["average_confidence_score"], 0.0)
+
+    def test_statistics_table_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Finding statistics", report)
+            self.assertIn("### By detection type", report)
+            self.assertIn("### By confidence band", report)
+            self.assertIn("Average confidence score:", report)
+
+    def test_trajectory_graph_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Agent trajectory graph", report)
+            self.assertIn("```mermaid", report)
+            self.assertIn("flowchart LR", report)
+            self.assertIn("subgraph", report)
+            self.assertIn("trajectories.json", report)
+
+            trajectories = json.loads((results_dir / "trajectories.json").read_text())
+            self.assertGreater(len(trajectories), 0)
+            agents_in_graph = set()
+            for t in trajectories:
+                for node in t["path"]:
+                    if node["type"] == "agent":
+                        agents_in_graph.add(node["id"])
+            for agent_id in agents_in_graph:
+                self.assertIn(agent_id, report)
+
+    def test_agent_clusters_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            self.assertIn("agent_clusters", summary["findings"])
+            self.assertGreater(summary["findings"]["agent_clusters"], 0)
+
+            clusters = json.loads((results_dir / "clusters.json").read_text())
+            self.assertIsInstance(clusters, list)
+            self.assertGreater(len(clusters), 0)
+            for cluster in clusters:
+                self.assertIn("agents", cluster)
+                self.assertIn("shared_credentials", cluster)
+                self.assertIn("board_messages", cluster)
+                self.assertIn("size", cluster)
+                self.assertGreaterEqual(cluster["size"], 2)
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Agent clusters", report)
+            self.assertIn("clusters.json", report)
+
+    def test_agent_clusters_empty_when_no_links(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        clusters = _detect_agent_clusters({}, [], {"a", "b", "c"})
+        self.assertEqual(clusters, [])
+
+    def test_agent_clusters_from_shared_credential(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        cred_agents: dict[str, set[str]] = {"cred-1": {"agent-a", "agent-b"}}
+        clusters = _detect_agent_clusters(cred_agents, [], {"agent-a", "agent-b", "agent-c"})
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(set(clusters[0]["agents"]), {"agent-a", "agent-b"})
+        self.assertEqual(clusters[0]["shared_credentials"], ["cred-1"])
+
+    def test_agent_clusters_from_board_edges(self) -> None:
+        from orbit_ir.analyzer import _detect_agent_clusters
+        edges = [("agent-x", "agent-y"), ("agent-x", "agent-y")]
+        clusters = _detect_agent_clusters({}, edges, {"agent-x", "agent-y", "agent-z"})
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(set(clusters[0]["agents"]), {"agent-x", "agent-y"})
+        self.assertEqual(clusters[0]["board_messages"], 2)
+
+    def test_trajectory_graph_empty_when_no_trajectories(self) -> None:
+        from orbit_ir.analyzer import _render_trajectory_graph
+        self.assertEqual(_render_trajectory_graph([]), "")
+
+    def test_confidence_score_in_csv(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir)
+
+            with (results_dir / "findings.csv").open() as f:
+                reader = csv.DictReader(f)
+                self.assertIn("confidence_score", reader.fieldnames)
+                for row in reader:
+                    score = float(row["confidence_score"])
+                    self.assertGreaterEqual(score, 0.0)
+                    self.assertLessEqual(score, 1.0)
+
+
+    def test_sarif_output_is_valid_and_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir)
+
+            sarif_path = results_dir / "findings.sarif"
+            self.assertTrue(sarif_path.exists())
+
+            sarif = json.loads(sarif_path.read_text())
+            self.assertEqual(sarif["version"], "2.1.0")
+            self.assertIn("$schema", sarif)
+            self.assertEqual(len(sarif["runs"]), 1)
+
+            run = sarif["runs"][0]
+            self.assertEqual(run["tool"]["driver"]["name"], "orbit-ir")
+            self.assertIn("rules", run["tool"]["driver"])
+            self.assertGreater(len(run["results"]), 0)
+
+            for result in run["results"]:
+                self.assertIn("ruleId", result)
+                self.assertIn("level", result)
+                self.assertIn(result["level"], {"error", "warning", "note"})
+                self.assertIn("message", result)
+                self.assertIn("locations", result)
+                loc = result["locations"][0]["physicalLocation"]
+                self.assertIn("artifactLocation", loc)
+                self.assertIn("region", loc)
+                self.assertGreaterEqual(loc["region"]["startLine"], 1)
+
+    def test_sarif_cli_format_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                cli.main.__wrapped__ if hasattr(cli.main, "__wrapped__") else None
+                import sys
+                old_argv = sys.argv
+                sys.argv = [
+                    "orbit-ir", "analyze",
+                    "--input", str(evidence_dir),
+                    "--out", str(results_dir),
+                    "--format", "sarif",
+                ]
+                try:
+                    cli._run(cli.build_parser().parse_args())
+                finally:
+                    sys.argv = old_argv
+
+            output = stdout.getvalue()
+            sarif = json.loads(output)
+            self.assertEqual(sarif["version"], "2.1.0")
+            self.assertGreater(len(sarif["runs"][0]["results"]), 0)
+
+    def test_composite_risk_score_in_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(evidence_dir, results_dir)
+
+            self.assertIn("risk_score", summary["findings"])
+            self.assertIn("risk_rating", summary["findings"])
+            self.assertIn("risk_components", summary["findings"])
+
+            score = summary["findings"]["risk_score"]
+            self.assertGreaterEqual(score, 0)
+            self.assertLessEqual(score, 100)
+            self.assertIn(summary["findings"]["risk_rating"], {"none", "low", "medium", "high", "critical"})
+            self.assertGreater(score, 0)
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("Composite risk score", report)
+
+    def test_composite_risk_score_zero_when_clean(self) -> None:
+        from orbit_ir.analyzer import _composite_risk_score
+        result = _composite_risk_score(
+            spoofed=0, lateral=0, unbacked=0, oracle=0,
+            identity_trace=0, missing=0, shared_creds=0,
+            total_transcripts=100,
+        )
+        self.assertEqual(result["score"], 0)
+        self.assertEqual(result["rating"], "none")
+
+    def test_lateral_movement_detected_with_resource_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, lateral_accesses=4, seed=17,
+            )
+            evidence_dir = root / "evidence"
+            truth = generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            summary = analyze_dataset(
+                evidence_dir, results_dir,
+                ground_truth_path=evidence_dir / "ground_truth.json",
+            )
+
+            self.assertEqual(len(truth["lateral_access_tool_call_ids"]), 4)
+            self.assertIn("lateral_movement_detections", summary["findings"])
+            self.assertEqual(summary["findings"]["lateral_movement_detections"], 4)
+
+            lm_file = results_dir / "lateral_movement.json"
+            self.assertTrue(lm_file.exists())
+            detections = json.loads(lm_file.read_text())
+            self.assertEqual(len(detections), 4)
+            for d in detections:
+                self.assertIn("tool_call_id", d)
+                self.assertIn("resource_owner", d)
+                self.assertNotEqual(d["agent_id"], d["resource_owner"])
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Lateral movement", report)
+            self.assertIn("lateral_movement.json", report)
+
+            eval_result = summary["evaluation"]["lateral_movement_detection"]
+            self.assertEqual(eval_result["false_positive"], 0)
+            self.assertEqual(eval_result["false_negative"], 0)
+
+
+    def test_detection_methodology_in_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = LabConfig(
+                agents=40, messages=500, transcripts=80, participants=24,
+                spoofed_tool_calls=7, coordinators=3, unbacked_completions=5,
+                oracle_modifications=3, seed=42,
+            )
+            evidence_dir = root / "evidence"
+            generate_dataset(evidence_dir, config)
+            results_dir = root / "results"
+            analyze_dataset(evidence_dir, results_dir, ground_truth_path=evidence_dir / "ground_truth.json")
+
+            report = (results_dir / "report.md").read_text()
+            self.assertIn("## Detection methodology", report)
+            self.assertIn("tool-name-mismatch", report)
+            self.assertIn("All detections are deterministic", report)
 
 
 if __name__ == "__main__":

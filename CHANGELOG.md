@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Added credential-reuse detection: flags workload credentials shared across multiple agents.
+- Added unbacked-completion detection: agent claims "done" but independent check failed.
+- Added oracle-integrity-violation detection: agent modifies protected test expectations.
+- Generator plants both new conditions deterministically alongside existing spoofs.
+- Evaluation scores unbacked-completion and oracle-modification recovery separately.
+- Report and summary include new finding categories and evaluation rows.
+- Expanded test suite from 10 to 13 adversarial tests.
+- Inspired by memdoor team-solve: "done is a check, not a claim" and oracle integrity.
+
 ## 0.2.0
 
 - Removed the runtime dependency on `ground_truth.json`.

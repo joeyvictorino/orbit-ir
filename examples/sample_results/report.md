@@ -16,7 +16,10 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 
 1. 24 agents used an unsanctioned coordination channel, producing 410 events.
 2. Independent control-plane evidence contradicted 7 transcript tool-call records.
-3. The pipeline reported 7 total record conflicts and reconstructed 7 source-linked trajectories.
+5. 5 tool calls claimed completion but their independent check failed (unbacked completions).
+6. 3 tool calls modified protected test expectations (oracle integrity violations).
+7. 33 workload credentials were used by more than one agent (credential reuse).
+3. The pipeline reported 15 total record conflicts and reconstructed 15 source-linked trajectories.
 4. Missing, duplicate, identity, and trace conflicts are reported rather than silently discarded.
 
 ## Evaluation against an optional synthetic fixture
@@ -26,6 +29,8 @@ This is a reproducible synthetic exercise. It does not claim access to or experi
 | Transcript/tool mismatch | 1.0000 | 1.0000 | 7 | 0 | 0 |
 | Channel participation | 1.0000 | 1.0000 | 24 | 0 | 0 |
 | Coordinator threshold | 1.0000 | 1.0000 | 3 | 0 | 0 |
+| Unbacked completion | 1.0000 | 1.0000 | 5 | 0 | 0 |
+| Oracle integrity | 1.0000 | 1.0000 | 3 | 0 | 0 |
 
 The fixture is consulted only after detection. It does not determine the findings or the number of coordinators reported.
 
@@ -50,8 +55,8 @@ No LLM is used for extraction, joins, hashes, mismatch detection, or findings. A
 ## Evidence manifest
 
 - `messages.jsonl` (evidence): `92bd18ef6cba67ea2bd095be1ff637183a5e25406b68d068efae7c3c7b7f13af` (144,800 bytes)
-- `transcripts.jsonl` (evidence): `e12b6c6ff8205d19fed26be0776283f574b3038f42aa99a39c4a6777508504ea` (23,920 bytes)
-- `control_plane.jsonl` (evidence): `69312b21fbd1b99ca44927284f2c2f6a6213999d4d6277884d38b21ee8278401` (31,842 bytes)
-- `ground_truth.json` (evaluation-only): `b307aaab3c908db934048bfcd331010491f66e640c4a1cd1b5a0e8c0cce383ad` (1,004 bytes)
+- `transcripts.jsonl` (evidence): `0f84d9fd30df92fe5f8ffbef92c1f51cc57971d5f6d46987dc46abe275ac96a3` (25,849 bytes)
+- `control_plane.jsonl` (evidence): `857531bff1104f60c42c8f59fd11a91dbf369a6c9d77add0d2c94962714cc5df` (33,667 bytes)
+- `ground_truth.json` (evaluation-only): `3a396e82636cf9c1e0cbb4676ea075a806f86281fed6102e6e662e20c5e0b77e` (1,341 bytes)
 
-Runtime on the generating system: 0.012 seconds. Runtime is informational and hardware-dependent.
+Runtime on the generating system: 0.004 seconds. Runtime is informational and hardware-dependent.

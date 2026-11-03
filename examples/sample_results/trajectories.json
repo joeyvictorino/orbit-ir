@@ -5,6 +5,86 @@
     "finding_id": "finding-000001",
     "path": [
       {
+        "id": "agent-0003",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0003",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000002",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-02",
+        "type": "credential"
+      },
+      {
+        "id": "sandbox-2",
+        "type": "resource"
+      },
+      {
+        "id": "test-result-recorded-failing",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:3",
+      "transcript": "transcripts.jsonl:3"
+    },
+    "trace_id": "trace-000002"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000002",
+    "path": [
+      {
+        "id": "agent-0009",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0009",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000006",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-06",
+        "type": "credential"
+      },
+      {
+        "id": "sandbox-6",
+        "type": "resource"
+      },
+      {
+        "id": "test-result-recorded-failing",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:7",
+      "transcript": "transcripts.jsonl:7"
+    },
+    "trace_id": "trace-000006"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000003",
+    "path": [
+      {
         "id": "agent-0030",
         "type": "workload_identity"
       },
@@ -42,7 +122,7 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000002",
+    "finding_id": "finding-000004",
     "path": [
       {
         "id": "agent-0003",
@@ -82,7 +162,87 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000003",
+    "finding_id": "finding-000005",
+    "path": [
+      {
+        "id": "agent-0007",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0007",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000047",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-00",
+        "type": "credential"
+      },
+      {
+        "id": "sandbox-16",
+        "type": "resource"
+      },
+      {
+        "id": "test-result-recorded-failing",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:48",
+      "transcript": "transcripts.jsonl:48"
+    },
+    "trace_id": "trace-000047"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000006",
+    "path": [
+      {
+        "id": "agent-0009",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0009",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000049",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-02",
+        "type": "credential"
+      },
+      {
+        "id": "sandbox-18",
+        "type": "resource"
+      },
+      {
+        "id": "test-result-recorded-failing",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:50",
+      "transcript": "transcripts.jsonl:50"
+    },
+    "trace_id": "trace-000049"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000007",
     "path": [
       {
         "id": "agent-0012",
@@ -122,7 +282,47 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000004",
+    "finding_id": "finding-000008",
+    "path": [
+      {
+        "id": "agent-0018",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0018",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000058",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-11",
+        "type": "credential"
+      },
+      {
+        "id": "sandbox-27",
+        "type": "resource"
+      },
+      {
+        "id": "test-result-recorded-failing",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:59",
+      "transcript": "transcripts.jsonl:59"
+    },
+    "trace_id": "trace-000058"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000009",
     "path": [
       {
         "id": "agent-0020",
@@ -162,7 +362,7 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000005",
+    "finding_id": "finding-000010",
     "path": [
       {
         "id": "agent-0024",
@@ -202,7 +402,127 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000006",
+    "finding_id": "finding-000011",
+    "path": [
+      {
+        "id": "agent-0026",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0026",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000066",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-19",
+        "type": "credential"
+      },
+      {
+        "id": "tests/2.out",
+        "type": "resource"
+      },
+      {
+        "id": "test-expectation-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:67",
+      "transcript": "transcripts.jsonl:67"
+    },
+    "trace_id": "trace-000066"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000012",
+    "path": [
+      {
+        "id": "agent-0034",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0034",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000074",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-27",
+        "type": "credential"
+      },
+      {
+        "id": "tests/5.out",
+        "type": "resource"
+      },
+      {
+        "id": "test-expectation-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:75",
+      "transcript": "transcripts.jsonl:75"
+    },
+    "trace_id": "trace-000074"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000013",
+    "path": [
+      {
+        "id": "agent-0035",
+        "type": "workload_identity"
+      },
+      {
+        "id": "agent-0035",
+        "type": "agent"
+      },
+      {
+        "id": "tool-000075",
+        "type": "tool_call"
+      },
+      {
+        "id": "workload-token-28",
+        "type": "credential"
+      },
+      {
+        "id": "tests/1.out",
+        "type": "resource"
+      },
+      {
+        "id": "test-expectation-modified",
+        "type": "effect"
+      },
+      {
+        "id": "allow",
+        "type": "control_decision"
+      }
+    ],
+    "source_refs": {
+      "control_plane": "control_plane.jsonl:76",
+      "transcript": "transcripts.jsonl:76"
+    },
+    "trace_id": "trace-000075"
+  },
+  {
+    "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
+    "confidence": "high",
+    "finding_id": "finding-000014",
     "path": [
       {
         "id": "agent-0036",
@@ -242,7 +562,7 @@
   {
     "basis": "stable tool_call_id reconciled against independent control-plane telemetry",
     "confidence": "high",
-    "finding_id": "finding-000007",
+    "finding_id": "finding-000015",
     "path": [
       {
         "id": "agent-0039",
