@@ -1,286 +1,133 @@
-"""API key and secret leakage detection for agent evidence.
-
-Analyzes agent evidence for API key and credential leakage — agents
-exposing API keys, bearer tokens, passwords, connection strings,
-private keys, or credentials in URLs through their outputs or logs.
-"""
-from __future__ import annotations
+"""API key leak detection module for agent incident reconstruction."""
 
 import json
-import re
-from collections import defaultdict
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Any
+
+CATEGORIES = {
+    "cloud_key_leak": [
+        "aws access key", "aws secret key", "azure api key",
+        "gcp service account key", "cloud credentials exposed",
+        "iam key leaked", "cloud key in logs", "s3 key exposed",
+        "azure connection string", "gcp api key leak",
+    ],
+    "token_exposure": [
+        "api token exposed", "bearer token leaked", "oauth token in logs",
+        "jwt secret exposed", "session token leak", "refresh token exposed",
+        "access token logged", "auth token in url", "token in query string",
+        "personal access token",
+    ],
+    "secret_in_code": [
+        "hardcoded secret", "secret in source code", "api key in code",
+        "credentials in repository", "secret committed", "key in git history",
+        "password in source", "secret in config file", "plaintext credentials",
+        "embedded api key",
+    ],
+    "key_misuse": [
+        "api key abuse", "stolen api key", "unauthorized api access",
+        "key used from unusual ip", "api key brute force",
+        "rate limit bypass with key", "key sharing detected",
+        "api key reuse", "compromised api key", "key used after revocation",
+    ],
+    "env_leak": [
+        "environment variable leak", "env file exposed", "dotenv exposed",
+        ".env in public repo", "environment secrets logged",
+        "env variable in output", "secret in environment", "env dump",
+        "printenv exposure", "environment variable disclosure",
+    ],
+    "webhook_secret": [
+        "webhook secret exposed", "webhook token leaked",
+        "signing secret compromised", "webhook key in logs",
+        "notification secret leak", "callback secret exposed",
+        "webhook authentication bypass", "hmac secret leaked",
+        "webhook signature key", "integration secret exposed",
+    ],
+}
 
 
-API_KEY_PATTERNS = re.compile(
-    r"(AKIA[0-9A-Z]{16}|"  # AWS access key
-    r"AIza[0-9A-Za-z\-_]{35}|"  # GCP API key
-    r"sk-[A-Za-z0-9]{20,}|"  # OpenAI API key
-    r"ghp_[A-Za-z0-9]{36}|"  # GitHub PAT
-    r"ghs_[A-Za-z0-9]{36}|"  # GitHub App token
-    r"xox[bpras]-[A-Za-z0-9\-]{10,}|"  # Slack token
-    r"sq0[a-z]{3}-[A-Za-z0-9\-_]{22,})",  # Square
-)
-
-BEARER_TOKEN_PATTERN = re.compile(
-    r"(?:Authorization|Bearer)\s*[:=]\s*Bearer\s+[A-Za-z0-9\-_.~+/]+=*",
-    re.IGNORECASE,
-)
-
-PASSWORD_PLAINTEXT_PATTERN = re.compile(
-    r"(?:password|passwd|pwd|secret|api_key|apikey|token)\s*[:=]\s*['\"]?[^\s'\"]{8,}",
-    re.IGNORECASE,
-)
-
-CONNECTION_STRING_PATTERN = re.compile(
-    r"(?:mongodb|postgres|mysql|redis|amqp|mssql)://[^\s]+:[^\s]+@[^\s]+",
-    re.IGNORECASE,
-)
-
-PRIVATE_KEY_PATTERN = re.compile(
-    r"-----BEGIN\s+(?:RSA\s+)?(?:PRIVATE|EC)\s+KEY-----",
-    re.IGNORECASE,
-)
-
-CREDENTIAL_URL_PATTERN = re.compile(
-    r"https?://[A-Za-z0-9._~%!$&'()*+,;=\-]+:[A-Za-z0-9._~%!$&'()*+,;=\-]+@[^\s]+",
-)
+def classify_event(event):
+    if event is None:
+        return "unknown"
+    if isinstance(event, dict):
+        text = " ".join(str(v) for v in event.values()).lower()
+    elif isinstance(event, str):
+        text = event.lower()
+    else:
+        return "unknown"
+    if not text.strip():
+        return "unknown"
+    for category, indicators in CATEGORIES.items():
+        for indicator in indicators:
+            if indicator in text:
+                return category
+    return "unknown"
 
 
-@dataclass
-class ApiKeyLeakFinding:
-    agent_id: str
-    pattern: str
-    leaked_type: str
-    timestamp: str
-    confidence: str
-    description: str
-    evidence: dict[str, Any] = field(default_factory=dict)
+def analyze(events):
+    total = len(events)
+    flagged = []
+    category_counts = {}
 
+    for i, event in enumerate(events):
+        cat = classify_event(event)
+        if cat != "unknown":
+            flagged.append({"index": i, "category": cat, "event": event})
+            category_counts[cat] = category_counts.get(cat, 0) + 1
 
-@dataclass
-class ApiKeyLeakSummary:
-    total_findings: int
-    api_key_in_output: int
-    bearer_token_exposure: int
-    password_in_plaintext: int
-    connection_string_leak: int
-    private_key_material: int
-    credential_in_url: int
-    agents_involved: int
-    by_confidence: dict[str, int] = field(default_factory=dict)
+    flagged_count = len(flagged)
+    if flagged_count > 10:
+        severity = "critical"
+    elif flagged_count > 5:
+        severity = "high"
+    elif flagged_count > 0:
+        severity = "medium"
+    else:
+        severity = "none"
 
-
-@dataclass
-class ApiKeyLeakReport:
-    findings: list[ApiKeyLeakFinding]
-    summary: ApiKeyLeakSummary
-    agents_involved: list[str]
-
-
-def _extract_output(ev: dict[str, Any]) -> str:
-    for k in ("output", "response", "result", "content", "message", "text", "log"):
-        val = ev.get(k, "")
-        if val:
-            return str(val)
-    return ""
-
-
-def _has_output(ev: dict[str, Any]) -> bool:
-    return len(_extract_output(ev)) > 10
-
-
-def _redact(s: str, keep: int = 6) -> str:
-    if len(s) <= keep:
-        return s
-    return s[:keep] + "..." + ("*" * min(8, len(s) - keep))
-
-
-def analyze_api_key_leaks(events: list[dict[str, Any]]) -> ApiKeyLeakReport:
-    agent_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for ev in events:
-        agent = ev.get("agent_id", "")
-        if not agent:
-            continue
-        if _has_output(ev):
-            agent_events[agent].append(ev)
-
-    findings: list[ApiKeyLeakFinding] = []
-
-    for agent, evs in sorted(agent_events.items()):
-        evs.sort(key=lambda e: e.get("timestamp", ""))
-        _detect_api_keys(agent, evs, findings)
-        _detect_bearer_tokens(agent, evs, findings)
-        _detect_passwords(agent, evs, findings)
-        _detect_connection_strings(agent, evs, findings)
-        _detect_private_keys(agent, evs, findings)
-        _detect_credential_urls(agent, evs, findings)
-
-    all_agents = sorted({f.agent_id for f in findings})
-    conf: dict[str, int] = defaultdict(int)
-    pattern_counts: dict[str, int] = defaultdict(int)
-    for f in findings:
-        conf[f.confidence] += 1
-        pattern_counts[f.pattern] += 1
-
-    return ApiKeyLeakReport(
-        findings=findings,
-        summary=ApiKeyLeakSummary(
-            total_findings=len(findings),
-            api_key_in_output=pattern_counts.get("api_key_in_output", 0),
-            bearer_token_exposure=pattern_counts.get("bearer_token_exposure", 0),
-            password_in_plaintext=pattern_counts.get("password_in_plaintext", 0),
-            connection_string_leak=pattern_counts.get("connection_string_leak", 0),
-            private_key_material=pattern_counts.get("private_key_material", 0),
-            credential_in_url=pattern_counts.get("credential_in_url", 0),
-            agents_involved=len(all_agents),
-            by_confidence=dict(conf),
-        ),
-        agents_involved=all_agents,
-    )
-
-
-def _detect_api_keys(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        match = API_KEY_PATTERNS.search(output)
-        if match:
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="api_key_in_output",
-                leaked_type="api_key",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed API key in output: {_redact(match.group())}",
-                evidence={"redacted_key": _redact(match.group())},
-            ))
-
-
-def _detect_bearer_tokens(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        if BEARER_TOKEN_PATTERN.search(output):
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="bearer_token_exposure",
-                leaked_type="bearer_token",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed Bearer token in output",
-                evidence={},
-            ))
-
-
-def _detect_passwords(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        match = PASSWORD_PLAINTEXT_PATTERN.search(output)
-        if match:
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="password_in_plaintext",
-                leaked_type="password",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed password/secret in plaintext",
-                evidence={"matched_pattern": match.group().split("=")[0].split(":")[0].strip()},
-            ))
-
-
-def _detect_connection_strings(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        match = CONNECTION_STRING_PATTERN.search(output)
-        if match:
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="connection_string_leak",
-                leaked_type="connection_string",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed database connection string with credentials",
-                evidence={"db_type": match.group().split("://")[0]},
-            ))
-
-
-def _detect_private_keys(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        if PRIVATE_KEY_PATTERN.search(output):
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="private_key_material",
-                leaked_type="private_key",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed private key material in output",
-                evidence={},
-            ))
-
-
-def _detect_credential_urls(agent: str, events: list[dict[str, Any]], findings: list[ApiKeyLeakFinding]) -> None:
-    for ev in events:
-        output = _extract_output(ev)
-        match = CREDENTIAL_URL_PATTERN.search(output)
-        if match:
-            findings.append(ApiKeyLeakFinding(
-                agent_id=agent,
-                pattern="credential_in_url",
-                leaked_type="url_credential",
-                timestamp=ev.get("timestamp", ""),
-                confidence="high",
-                description=f"Agent '{agent}' exposed credentials embedded in URL",
-                evidence={},
-            ))
-
-
-def _load_events(evidence_dir: str | Path) -> list[dict[str, Any]]:
-    evidence_dir = Path(evidence_dir)
-    events: list[dict[str, Any]] = []
-    for name in ("transcripts.jsonl", "control_plane.jsonl", "events.jsonl"):
-        p = evidence_dir / name
-        if p.exists():
-            for line in p.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line:
-                    try:
-                        events.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-    return events
-
-
-def format_text(report: ApiKeyLeakReport) -> str:
-    lines: list[str] = []
-    lines.append("API Key Leak Detection Report")
-    lines.append("=" * 62)
-    lines.append("")
-    s = report.summary
-    lines.append(f"  Total findings:          {s.total_findings}")
-    lines.append(f"  API keys in output:      {s.api_key_in_output}")
-    lines.append(f"  Bearer token exposure:   {s.bearer_token_exposure}")
-    lines.append(f"  Passwords in plaintext:  {s.password_in_plaintext}")
-    lines.append(f"  Connection string leaks: {s.connection_string_leak}")
-    lines.append(f"  Private key material:    {s.private_key_material}")
-    lines.append(f"  Credentials in URLs:     {s.credential_in_url}")
-    lines.append(f"  Agents involved:         {s.agents_involved}")
-    lines.append("")
-    if report.findings:
-        lines.append("  Findings:")
-        lines.append("  " + "-" * 58)
-        for f in report.findings:
-            lines.append(f"    [{f.confidence.upper()}] {f.pattern}: {f.agent_id}")
-            lines.append(f"      {f.description}")
-        lines.append("")
-    return "\n".join(lines) + "\n"
-
-
-def format_json(report: ApiKeyLeakReport) -> str:
-    data = {
-        "findings": [asdict(f) for f in report.findings],
-        "summary": asdict(report.summary),
-        "agents_involved": report.agents_involved,
+    return {
+        "total_events": total,
+        "flagged_count": flagged_count,
+        "flagged_events": flagged,
+        "category_counts": category_counts,
+        "severity": severity,
+        "detection_rate": flagged_count / total if total > 0 else 0.0,
     }
-    return json.dumps(data, indent=2, sort_keys=False, default=str) + "\n"
+
+
+def format_report(result):
+    lines = [
+        "API Key Leak Detection Report",
+        "=" * 40,
+        "",
+        f"  Total events:      {result['total_events']}",
+        f"  Flagged:           {result['flagged_count']}",
+        f"  Severity:          {result['severity']}",
+        f"  Detection rate:    {result['detection_rate']:.1%}",
+        "",
+    ]
+    if result["category_counts"]:
+        lines.append("  Categories:")
+        for cat, count in sorted(result["category_counts"].items()):
+            lines.append(f"    {cat:30s} {count}")
+        lines.append("")
+
+    shown = result["flagged_events"][:10]
+    if shown:
+        lines.append("  Flagged events:")
+        for entry in shown:
+            evt = str(entry["event"])[:80]
+            lines.append(f"    [{entry['index']}] {entry['category']:20s} {evt}")
+    if result["flagged_count"] > 10:
+        lines.append(f"    ... and {result['flagged_count'] - 10} more")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def load_events(path):
+    with open(path) as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        if "events" in data:
+            return data["events"]
+        return [data]
+    return [data]

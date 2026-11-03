@@ -1,304 +1,185 @@
-"""Tests for ransomware behavior detection module."""
-
 import json
+import os
+import tempfile
 import pytest
-from orbit_ir.ransomware import (
-    CATEGORIES,
-    analyze_ransomware,
-    format_text,
-    format_json,
-    _classify_event,
-    _detect_chains,
-    _load_events,
-)
+from orbit_ir.ransomware import classify_event, analyze, format_report, load_events, CATEGORIES
 
 
-def mk_event(action="", detail="", agent_id="agent-1", **kwargs):
-    ev = {"action": action, "detail": detail, "agent_id": agent_id, "timestamp": "2024-01-01T00:00:00Z"}
-    ev.update(kwargs)
-    return ev
+class TestClassifyEvent:
+    def test_file_encryption(self):
+        assert classify_event("mass encryption of user files detected") == "file_encryption"
+
+    def test_crypto_locker(self):
+        assert classify_event("crypto locker process started") == "file_encryption"
+
+    def test_ransomware_encryption(self):
+        assert classify_event("ransomware encryption routine active") == "file_encryption"
+
+    def test_ransom_note(self):
+        assert classify_event("ransom note dropped in directories") == "ransom_note"
+
+    def test_bitcoin_payment(self):
+        assert classify_event("bitcoin payment demanded for decryption") == "ransom_note"
+
+    def test_decryption_key_demand(self):
+        assert classify_event("decryption key demand sent to victim") == "ransom_note"
+
+    def test_shadow_copy_deletion(self):
+        assert classify_event("shadow copy deletion via vssadmin") == "shadow_copy"
+
+    def test_vssadmin_delete(self):
+        assert classify_event("vssadmin delete shadows /all") == "shadow_copy"
+
+    def test_backup_deletion(self):
+        assert classify_event("backup deletion across all drives") == "shadow_copy"
+
+    def test_ransomware_propagation(self):
+        assert classify_event("ransomware propagation to adjacent hosts") == "lateral_spread"
+
+    def test_smb_propagation(self):
+        assert classify_event("smb propagation of malware payload") == "lateral_spread"
+
+    def test_network_share_encryption(self):
+        assert classify_event("network share encryption started") == "lateral_spread"
+
+    def test_antivirus_disabled(self):
+        assert classify_event("antivirus disabled by malicious process") == "defense_evasion"
+
+    def test_defender_disabled(self):
+        assert classify_event("defender disabled via group policy") == "defense_evasion"
+
+    def test_edr_bypass(self):
+        assert classify_event("edr bypass technique observed") == "defense_evasion"
+
+    def test_double_extortion(self):
+        assert classify_event("double extortion campaign launched") == "exfil_before_encrypt"
+
+    def test_data_theft_before_encryption(self):
+        assert classify_event("data theft before encryption phase") == "exfil_before_encrypt"
+
+    def test_leak_site_upload(self):
+        assert classify_event("leak site upload of stolen data") == "exfil_before_encrypt"
+
+    def test_unknown(self):
+        assert classify_event("normal file access operation") == "unknown"
+
+    def test_none_event(self):
+        assert classify_event(None) == "unknown"
+
+    def test_empty_string(self):
+        assert classify_event("") == "unknown"
+
+    def test_whitespace_only(self):
+        assert classify_event("   ") == "unknown"
+
+    def test_dict_event(self):
+        assert classify_event({"action": "mass encryption detected"}) == "file_encryption"
+
+    def test_case_insensitive(self):
+        assert classify_event("RANSOM NOTE Dropped") == "ransom_note"
+
+    def test_non_string_non_dict(self):
+        assert classify_event(42) == "unknown"
+
+
+class TestAnalyze:
+    def test_empty(self):
+        result = analyze([])
+        assert result["total_events"] == 0
+        assert result["flagged_count"] == 0
+        assert result["severity"] == "none"
+
+    def test_single_match(self):
+        result = analyze(["file encryption detected"])
+        assert result["flagged_count"] == 1
+        assert result["severity"] == "medium"
+
+    def test_no_matches(self):
+        result = analyze(["normal file access", "standard backup operation"])
+        assert result["flagged_count"] == 0
+
+    def test_severity_high(self):
+        events = [f"file encryption event {i}" for i in range(6)]
+        result = analyze(events)
+        assert result["severity"] == "high"
+
+    def test_severity_critical(self):
+        events = [f"file encryption event {i}" for i in range(11)]
+        result = analyze(events)
+        assert result["severity"] == "critical"
+
+    def test_category_counts(self):
+        events = ["file encryption started", "ransom note found", "file encryption again"]
+        result = analyze(events)
+        assert result["category_counts"]["file_encryption"] == 2
+        assert result["category_counts"]["ransom_note"] == 1
+
+    def test_detection_rate(self):
+        result = analyze(["file encryption", "normal", "ransom note", "safe"])
+        assert result["detection_rate"] == 0.5
+
+    def test_flagged_structure(self):
+        result = analyze(["ransomware encryption active"])
+        entry = result["flagged_events"][0]
+        assert entry["index"] == 0
+        assert entry["category"] == "file_encryption"
+        assert entry["event"] == "ransomware encryption active"
+
+
+class TestFormatReport:
+    def test_format_empty(self):
+        result = analyze([])
+        text = format_report(result)
+        assert "Ransomware" in text
+
+    def test_format_with_findings(self):
+        result = analyze(["ransom note dropped"])
+        text = format_report(result)
+        assert "ransom_note" in text
+
+    def test_format_truncation(self):
+        events = [f"file encryption event {i}" for i in range(15)]
+        result = analyze(events)
+        text = format_report(result)
+        assert "... and 5 more" in text
+
+    def test_format_detection_rate(self):
+        result = analyze(["file encryption", "normal"])
+        text = format_report(result)
+        assert "50.0%" in text
+
+
+class TestLoadEvents:
+    def test_load_list(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(["event1", "event2"], f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 2
+
+    def test_load_dict_with_events_key(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"events": ["a", "b"]}, f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 2
+
+    def test_load_single_dict(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"action": "test"}, f)
+            f.flush()
+            events = load_events(f.name)
+        os.unlink(f.name)
+        assert len(events) == 1
 
 
 class TestCategories:
     def test_all_categories_have_patterns(self):
-        for name, info in CATEGORIES.items():
-            assert len(info["patterns"]) > 0, f"{name} has no patterns"
+        for cat, patterns in CATEGORIES.items():
+            assert len(patterns) > 0, f"category {cat} has no patterns"
 
-    def test_all_categories_have_severity(self):
-        for name, info in CATEGORIES.items():
-            assert info["severity"] in ("critical", "high", "medium", "low")
-
-    def test_all_categories_have_description(self):
-        for name, info in CATEGORIES.items():
-            assert len(info["description"]) > 0
-
-
-class TestFileEncryption:
-    def test_encrypt_files(self):
-        ev = mk_event(action="encrypt files on disk")
-        results = _classify_event(ev)
-        assert any(r.category == "file_encryption" for r in results)
-
-    def test_mass_encryption(self):
-        ev = mk_event(detail="mass encrypt all documents in directory")
-        results = _classify_event(ev)
-        assert any(r.category == "file_encryption" for r in results)
-
-    def test_ransomware_keyword(self):
-        ev = mk_event(action="ransomware detected in system")
-        results = _classify_event(ev)
-        assert any(r.category == "file_encryption" for r in results)
-
-    def test_aes_encryption(self):
-        ev = mk_event(detail="AES encrypt key generation for files")
-        results = _classify_event(ev)
-        assert any(r.category == "file_encryption" for r in results)
-
-
-class TestRansomNote:
-    def test_ransom_note_creation(self):
-        ev = mk_event(action="create ransom note on desktop")
-        results = _classify_event(ev)
-        assert any(r.category == "ransom_note" for r in results)
-
-    def test_readme_decrypt(self):
-        ev = mk_event(detail="README_DECRYPT file dropped")
-        results = _classify_event(ev)
-        assert any(r.category == "ransom_note" for r in results)
-
-    def test_bitcoin_payment(self):
-        ev = mk_event(detail="pay bitcoin to recover files")
-        results = _classify_event(ev)
-        assert any(r.category == "ransom_note" for r in results)
-
-    def test_extortion_message(self):
-        ev = mk_event(action="extortion message delivered to victim")
-        results = _classify_event(ev)
-        assert any(r.category == "ransom_note" for r in results)
-
-
-class TestShadowDeletion:
-    def test_delete_shadow_copies(self):
-        ev = mk_event(action="delete shadow copies from system")
-        results = _classify_event(ev)
-        assert any(r.category == "shadow_deletion" for r in results)
-
-    def test_vssadmin(self):
-        ev = mk_event(detail="vssadmin delete shadows")
-        results = _classify_event(ev)
-        assert any(r.category == "shadow_deletion" for r in results)
-
-    def test_disable_recovery(self):
-        ev = mk_event(action="disable recovery mechanisms")
-        results = _classify_event(ev)
-        assert any(r.category == "shadow_deletion" for r in results)
-
-    def test_destroy_backups(self):
-        ev = mk_event(detail="destroy backup snapshots")
-        results = _classify_event(ev)
-        assert any(r.category == "shadow_deletion" for r in results)
-
-
-class TestLateralSpread:
-    def test_spread_to_systems(self):
-        ev = mk_event(action="spread to adjacent systems via network")
-        results = _classify_event(ev)
-        assert any(r.category == "lateral_spread" for r in results)
-
-    def test_network_worm(self):
-        ev = mk_event(detail="self-propagating worm behavior detected")
-        results = _classify_event(ev)
-        assert any(r.category == "lateral_spread" for r in results)
-
-    def test_smb_spread(self):
-        ev = mk_event(action="SMB spread to lateral network shares")
-        results = _classify_event(ev)
-        assert any(r.category == "lateral_spread" for r in results)
-
-
-class TestC2Ransom:
-    def test_c2_communication(self):
-        ev = mk_event(detail="command control server ransom key exchange")
-        results = _classify_event(ev)
-        assert any(r.category == "c2_ransom" for r in results)
-
-    def test_double_extortion(self):
-        ev = mk_event(action="double extortion attack campaign detected")
-        results = _classify_event(ev)
-        assert any(r.category == "c2_ransom" for r in results)
-
-
-class TestKeyExfiltration:
-    def test_key_exfil(self):
-        ev = mk_event(action="exfiltrate encryption key to remote server")
-        results = _classify_event(ev)
-        assert any(r.category == "key_exfiltration" for r in results)
-
-    def test_crypto_key_send(self):
-        ev = mk_event(detail="send encryption key material to C2")
-        results = _classify_event(ev)
-        assert any(r.category == "key_exfiltration" for r in results)
-
-
-class TestClassifyEvent:
-    def test_empty_event(self):
-        results = _classify_event({})
-        assert results == []
-
-    def test_benign_event(self):
-        ev = mk_event(action="user logged in successfully")
-        results = _classify_event(ev)
-        assert results == []
-
-    def test_severity_critical(self):
-        ev = mk_event(action="encrypt files on disk")
-        results = _classify_event(ev)
-        assert results[0].severity == "critical"
-
-    def test_event_fields_populated(self):
-        ev = mk_event(action="encrypt files on disk", agent_id="agent-42")
-        results = _classify_event(ev)
-        assert results[0].agent_id == "agent-42"
-        assert results[0].violation_type == "ransomware_behavior"
-
-
-class TestDetectChains:
-    def test_single_agent_chain(self):
-        events = [
-            mk_event(action="encrypt files on disk"),
-            mk_event(action="create ransom note"),
-        ]
-        violations = []
-        for ev in events:
-            violations.extend(_classify_event(ev))
-        chains = _detect_chains(violations)
-        assert len(chains) == 1
-        assert chains[0].violation_score > 0
-
-    def test_multi_agent_chains(self):
-        events = [
-            mk_event(action="encrypt files on disk", agent_id="a1"),
-            mk_event(action="create ransom note", agent_id="a2"),
-        ]
-        violations = []
-        for ev in events:
-            violations.extend(_classify_event(ev))
-        chains = _detect_chains(violations)
-        assert len(chains) == 2
-
-    def test_chain_score_increases_with_categories(self):
-        events1 = [mk_event(action="encrypt files on disk")]
-        events2 = [
-            mk_event(action="encrypt files on disk"),
-            mk_event(action="create ransom note"),
-            mk_event(action="delete shadow copies"),
-        ]
-        v1 = []
-        for ev in events1:
-            v1.extend(_classify_event(ev))
-        v2 = []
-        for ev in events2:
-            v2.extend(_classify_event(ev))
-        c1 = _detect_chains(v1)
-        c2 = _detect_chains(v2)
-        assert c2[0].violation_score > c1[0].violation_score
-
-
-class TestAnalyzeRansomware:
-    def test_empty(self):
-        r = analyze_ransomware([])
-        assert r.total_events == 0
-        assert r.violation_events == 0
-
-    def test_with_violations(self):
-        events = [
-            mk_event(action="encrypt files on disk"),
-            mk_event(action="create ransom note on desktop"),
-        ]
-        r = analyze_ransomware(events)
-        assert r.total_events == 2
-        assert r.violation_events >= 2
-        assert len(r.categories) > 0
-
-    def test_severity_counts(self):
-        events = [mk_event(action="encrypt files on disk")]
-        r = analyze_ransomware(events)
-        assert "critical" in r.severity_counts
-
-    def test_agents_involved(self):
-        events = [
-            mk_event(action="encrypt files on disk", agent_id="a1"),
-            mk_event(action="create ransom note", agent_id="a2"),
-        ]
-        r = analyze_ransomware(events)
-        assert "a1" in r.agents_involved
-        assert "a2" in r.agents_involved
-
-    def test_benign_events_not_counted(self):
-        events = [mk_event(action="user logged in")]
-        r = analyze_ransomware(events)
-        assert r.violation_events == 0
-
-
-class TestFormatText:
-    def test_header(self):
-        r = analyze_ransomware([])
-        text = format_text(r)
-        assert "Ransomware Behavior Detection" in text
-
-    def test_contains_counts(self):
-        events = [mk_event(action="encrypt files on disk")]
-        r = analyze_ransomware(events)
-        text = format_text(r)
-        assert "Total events" in text
-
-    def test_contains_categories(self):
-        events = [mk_event(action="encrypt files on disk")]
-        r = analyze_ransomware(events)
-        text = format_text(r)
-        assert "file_encryption" in text
-
-
-class TestFormatJSON:
-    def test_valid_json(self):
-        events = [mk_event(action="encrypt files on disk")]
-        r = analyze_ransomware(events)
-        out = format_json(r)
-        data = json.loads(out)
-        assert "total_events" in data
-        assert "categories" in data
-
-    def test_empty_valid(self):
-        r = analyze_ransomware([])
-        data = json.loads(format_json(r))
-        assert data["total_events"] == 0
-
-    def test_chains_in_json(self):
-        events = [mk_event(action="encrypt files on disk")]
-        r = analyze_ransomware(events)
-        data = json.loads(format_json(r))
-        assert "chains" in data
-
-
-class TestLoadEvents:
-    def test_nonexistent_file(self):
-        events = _load_events("/nonexistent/path.json")
-        assert events == []
-
-    def test_load_list(self, tmp_path):
-        f = tmp_path / "events.json"
-        f.write_text(json.dumps([{"action": "test"}]))
-        events = _load_events(str(f))
-        assert len(events) == 1
-
-    def test_load_dict_with_events(self, tmp_path):
-        f = tmp_path / "events.json"
-        f.write_text(json.dumps({"events": [{"action": "test"}]}))
-        events = _load_events(str(f))
-        assert len(events) == 1
-
-    def test_load_single_dict(self, tmp_path):
-        f = tmp_path / "event.json"
-        f.write_text(json.dumps({"action": "test"}))
-        events = _load_events(str(f))
-        assert len(events) == 1
+    def test_category_names(self):
+        expected = {"file_encryption", "ransom_note", "shadow_copy", "lateral_spread", "defense_evasion", "exfil_before_encrypt"}
+        assert set(CATEGORIES.keys()) == expected
