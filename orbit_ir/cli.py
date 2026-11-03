@@ -184,6 +184,8 @@ from .role_impersonation import analyze_role_impersonation, format_text as forma
 from .token_smuggle import analyze_token_smuggling, format_text as format_ts_text, format_json as format_ts_json, _load_events as _load_ts_events
 from .memory_tampering import analyze_memory_tampering, format_text as format_memtamp_text, format_json as format_memtamp_json, _load_events as _load_memtamp_events
 from .trust_escalation import analyze_trust_escalation, format_text as format_tescal_text, format_json as format_tescal_json, _load_events as _load_tescal_events
+from .model_manipulation import analyze_model_manipulation, format_text as format_mm_text, format_json as format_mm_json, _load_events as _load_mm_events
+from .covert_channel import analyze_covert_channels, format_text as format_cc_text, format_json as format_cc_json, _load_events as _load_cc_events
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1263,6 +1265,16 @@ def build_parser() -> argparse.ArgumentParser:
     te_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
     te_p.add_argument("--format", choices=["text", "json"], default="text")
     te_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    mm_p = subparsers.add_parser("model-manipulation", help="Detect model manipulation attempts by agents")
+    mm_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    mm_p.add_argument("--format", choices=["text", "json"], default="text")
+    mm_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
+
+    cc_p = subparsers.add_parser("covert-channel", help="Detect covert communication channels between agents")
+    cc_p.add_argument("evidence_dir", type=Path, help="Evidence directory")
+    cc_p.add_argument("--format", choices=["text", "json"], default="text")
+    cc_p.add_argument("--output", type=Path, default=None, help="Write output to file instead of stdout")
 
     demo = subparsers.add_parser("demo", help="Generate and analyze a full deterministic exercise")
     demo.add_argument("--workdir", type=Path, default=Path("work"))
@@ -3766,6 +3778,46 @@ def _run(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(output, encoding="utf-8")
             print(f"Trust escalation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "model-manipulation":
+        from orbit_ir.model_manipulation import (
+            analyze_model_manipulation,
+            format_json as format_mm_json,
+            format_text as format_mm_text,
+        )
+        from orbit_ir.model_manipulation import _load_events as _load_mm_events
+        events = _load_mm_events(str(args.evidence_dir))
+        report = analyze_model_manipulation(events)
+        if args.format == "json":
+            output = format_mm_json(report)
+        else:
+            output = format_mm_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Model manipulation analysis written to {args.output}", file=sys.stderr)
+        else:
+            print(output, end="")
+        return
+    elif args.command == "covert-channel":
+        from orbit_ir.covert_channel import (
+            analyze_covert_channels,
+            format_json as format_cc_json,
+            format_text as format_cc_text,
+        )
+        from orbit_ir.covert_channel import _load_events as _load_cc_events
+        events = _load_cc_events(str(args.evidence_dir))
+        report = analyze_covert_channels(events)
+        if args.format == "json":
+            output = format_cc_json(report)
+        else:
+            output = format_cc_text(report)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output, encoding="utf-8")
+            print(f"Covert channel analysis written to {args.output}", file=sys.stderr)
         else:
             print(output, end="")
         return
